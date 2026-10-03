@@ -130,6 +130,12 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     // Only run polling if explicitly configured and not running in test mode
     if (process.env.NODE_ENV !== 'test' && process.env.TELEGRAM_POLLING === 'true') {
       this.logger.log('Starting Telegram bot polling...');
+      try {
+        await this.bot.api.deleteWebhook({ drop_pending_updates: false });
+      } catch {
+        // Webhook might not exist, proceed
+      }
+
       this.bot.start({
         onStart: (botInfo) => {
           this.logger.log(`Telegram Bot @${botInfo.username} started`);

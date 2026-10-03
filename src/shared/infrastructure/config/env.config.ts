@@ -9,6 +9,7 @@ const envSchema = z.object({
   ADMIN_API_KEY: z.string().min(8, 'ADMIN_API_KEY must be at least 8 characters long'),
   PORT: z.coerce.number().default(3000),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  TELEGRAM_POLLING: z.string().optional().default('false'),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;
