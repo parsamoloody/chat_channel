@@ -1,0 +1,111 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String            @id @default(uuid())
+  telegramUserId  String            @unique
+  username        String?
+  firstName       String?
+  lastName        String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  referrals       Referral[]
+  participants    ChatParticipant[]
+  messages        Message[]
+  matchesAsUser1  Match[]           @relation("User1Matches")
+  matchesAsUser2  Match[]           @relation("User2Matches")
+
+  @@index([telegramUserId])
+}
+
+model Referral {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String   // "MATCH", "REFERRAL", "INVITE"
+  referenceId String?  // Extracted reference ID
+  source      String   // "ORGANIC", "REFERRAL"
+  rawPayload  String?  // Raw deep link start payload
+  status      String   // "PENDING", "RESOLVED", "FAILED", "EXPIRED"
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([referenceId])
+  @@index([type, referenceId])
+}
+
+model Match {
+  id              String    @id @default(uuid())
+  externalMatchId String    @unique // Unique external identifier from Dating Bot
+  user1Id         String
+  user1           User      @relation("User1Matches", fields: [user1Id], references: [id], onDelete: Cascade)
+  user2Id         String
+  user2           User      @relation("User2Matches", fields: [user2Id], references: [id], onDelete: Cascade)
+  status          String    @default("ACTIVE") // "ACTIVE", "EXPIRED", "CANCELLED"
+  expiresAt       DateTime?
+  createdAt       DateTime  @default(now())
+  chat            Chat?
+
+  @@index([user1Id])
+  @@index([user2Id])
+  @@index([externalMatchId])
+}
+
+model Chat {
+  id           String            @id @default(uuid())
+  matchId      String?           @unique // Unique constraint guarantees 1 match produces exactly 1 chat
+  match        Match?            @relation(fields: [matchId], references: [id], onDelete: SetNull)
+  visibility   String            @default("HIDDEN") // "HIDDEN", "PUBLIC", "PRIVATE"
+  title        String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  participants ChatParticipant[]
+  messages     Message[]
+
+  @@index([visibility])
+  @@index([matchId])
+}
+
+model ChatParticipant {
+  id       String   @id @default(uuid())
+  chatId   String
+  chat     Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role     String   @default("MEMBER") // "MEMBER", "ADMIN"
+  joinedAt DateTime @default(now())
+
+  @@unique([chatId, userId]) // Idempotency constraint: cannot add user twice
+  @@index([userId])
+  @@index([chatId])
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  chatId    String
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([chatId, createdAt])
+  @@index([senderId])
+}
+
+model AdminUser {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  apiKey    String   @unique
+  role      String   @default("ADMIN")
+  createdAt DateTime @default(now())
+}
