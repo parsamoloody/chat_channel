@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "rm -rf dist && tsc",
     "start": "node dist/src/main.js",
     "start:dev": "ts-node -r reflect-metadata src/main.ts",
     "test": "jest --runInBand",
