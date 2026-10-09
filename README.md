@@ -177,13 +177,18 @@ HandleTelegramStartUseCase
 | `GET` | `/api/v1/chats/:chatId/messages` | Lists chat messages (only for participants) |
 | `POST` | `/api/v1/chats/:chatId/messages` | Sends a message to the chat (only for participants) |
 
-### Admin Endpoints (Guarded by `AdminApiKeyGuard` via `x-admin-key`)
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/v1/admin/chats` | Lists hidden chats with pagination (`limit`, `offset`) |
-| `GET` | `/api/v1/admin/chats/:chatId` | Inspects hidden chat, participants, users, match context |
-| `GET` | `/api/v1/admin/chats/:chatId/messages` | Inspects chat message history |
-| `GET` | `/api/v1/admin/referrals` | Lists tracked referral events with pagination |
+### Admin Endpoints (Guarded by `AdminApiKeyGuard` via `x-api-key` or `Authorization: Bearer <key>`)
+| Method | Endpoint | Query Parameters | Description |
+|---|---|---|---|
+| `POST` | `/api/v1/admin/match-ids` | — | Creates custom or batch `externalMatchId`s |
+| `GET` | `/api/v1/admin/match-ids` | `status`, `limit`, `offset` | Lists pool match IDs with pool stats |
+| `POST` | `/api/v1/admin/matches` | — | Creates a match between two users with optional custom `externalMatchId` |
+| `GET` | `/api/v1/admin/matches` | `status`, `limit`, `offset` | Lists all matches with pagination and filtering |
+| `GET` | `/api/v1/admin/matches/:matchId` | — | Gets match details and associated chat by `id` or `externalMatchId` |
+| `GET` | `/api/v1/admin/chats` | `limit`, `offset` | Lists hidden chats with pagination |
+| `GET` | `/api/v1/admin/chats/:chatId` | — | Inspects hidden chat, participants, users, match context |
+| `GET` | `/api/v1/admin/chats/:chatId/messages` | `limit`, `offset` | Inspects chat message history |
+| `GET` | `/api/v1/admin/referrals` | `limit`, `offset` | Lists tracked referral events with pagination |
 
 ### Telegram & System Endpoints
 | Method | Endpoint | Description |
@@ -193,12 +198,119 @@ HandleTelegramStartUseCase
 
 ---
 
-## 7. Configuration (`.env`)
+## 7. API Examples with Query Parameters & Headers
+
+Authentication is supported via either header:
+- `x-api-key: <ADMIN_API_KEY>` (or `x-admin-key`, `api-key`)
+- `Authorization: Bearer <ADMIN_API_KEY>`
+
+### 7.1 Match Pool IDs (`/api/v1/admin/match-ids`)
+
+Supported Query Parameters:
+- `status`: Filter by status (`AVAILABLE`, `USED`, or `ALL`). Default: `ALL`
+- `limit`: Number of items to return (default: `50`)
+- `offset`: Pagination offset (default: `0`)
+
+#### Example 1: List only `AVAILABLE` match IDs (limit: 5)
+```bash
+curl -X GET "http://localhost:3000/api/v1/admin/match-ids?status=AVAILABLE&limit=5" \
+  -H "x-api-key: your_secure_admin_api_key"
+```
+
+**Response Example:**
+```json
+{
+  "data": [
+    {
+      "id": "e4414f52-fb94-4d10-8b1b-b4618e470830",
+      "externalMatchId": "match_67af724f",
+      "status": "AVAILABLE",
+      "usedAt": null,
+      "createdAt": "2026-10-09T13:00:00.000Z",
+      "startPayload": "ref_match_67af724f",
+      "deepLinkSample": "https://t.me/your_bot_username?start=ref_match_67af724f"
+    }
+  ],
+  "total": 10,
+  "stats": {
+    "available": 10,
+    "used": 2,
+    "total": 12
+  }
+}
+```
+
+#### Example 2: List `USED` match IDs with pagination (`limit=10&offset=5`)
+```bash
+curl -X GET "http://localhost:3000/api/v1/admin/match-ids?status=USED&limit=10&offset=5" \
+  -H "x-api-key: your_secure_admin_api_key"
+```
+
+#### Example 3: Create Match IDs (Batch of 5 or Custom)
+```bash
+# Auto-generate 5 new match IDs
+curl -X POST "http://localhost:3000/api/v1/admin/match-ids" \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: your_secure_admin_api_key" \
+  -d '{"count": 5}'
+
+# Register a specific custom match ID
+curl -X POST "http://localhost:3000/api/v1/admin/match-ids" \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: your_secure_admin_api_key" \
+  -d '{"externalMatchId": "vip_campaign_2026"}'
+```
+
+---
+
+### 7.2 Matches List (`/api/v1/admin/matches`)
+
+Supported Query Parameters:
+- `status`: Filter by match status (`ACTIVE`, `PENDING_USER2`, `EXPIRED`, `CLOSED`)
+- `limit`: Number of items (default: `20`)
+- `offset`: Pagination offset (default: `0`)
+
+#### Example: List `ACTIVE` matches
+```bash
+curl -X GET "http://localhost:3000/api/v1/admin/matches?status=ACTIVE&limit=10&offset=0" \
+  -H "x-api-key: your_secure_admin_api_key"
+```
+
+---
+
+### 7.3 Inspect Chat Messages (`/api/v1/admin/chats/:chatId/messages`)
+
+Supported Query Parameters:
+- `limit`: Number of messages (default: `50`)
+- `offset`: Pagination offset (default: `0`)
+
+```bash
+curl -X GET "http://localhost:3000/api/v1/admin/chats/chat_12345/messages?limit=25&offset=0" \
+  -H "x-api-key: your_secure_admin_api_key"
+```
+
+---
+
+### 7.4 List Referrals (`/api/v1/admin/referrals`)
+
+Supported Query Parameters:
+- `limit`: Number of referral logs (default: `50`)
+- `offset`: Pagination offset (default: `0`)
+
+```bash
+curl -X GET "http://localhost:3000/api/v1/admin/referrals?limit=20&offset=0" \
+  -H "x-api-key: your_secure_admin_api_key"
+```
+
+---
+
+## 8. Configuration (`.env`)
 
 | Variable | Description | Default |
 |---|---|---|
 | `DATABASE_URL` | SQLite file or PostgreSQL connection URL | `file:./dev.db` |
 | `TELEGRAM_BOT_TOKEN` | Bot API token from @BotFather | (required) |
+| `TELEGRAM_BOT_USERNAME` | Telegram bot username without `@` (used in deep links) | `your_bot_username` |
 | `ADMIN_API_KEY` | Secret key for admin programmatic access | (required, min 8 chars) |
 | `PORT` | HTTP server port | `3000` |
 | `NODE_ENV` | Environment (`development`, `production`, `test`) | `development` |
@@ -206,7 +318,7 @@ HandleTelegramStartUseCase
 
 ---
 
-## 8. Running the Application & Tests
+## 9. Running the Application & Tests
 
 ### Prerequisites
 - Node.js >= 20.x

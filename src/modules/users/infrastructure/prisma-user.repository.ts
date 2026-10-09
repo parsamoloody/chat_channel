@@ -30,19 +30,22 @@ export class PrismaUserRepository implements IUserRepository {
         username: data.username ?? null,
         firstName: data.firstName ?? null,
         lastName: data.lastName ?? null,
+        activeChatId: data.activeChatId ?? null,
       },
     });
     return this.toDomain(record);
   }
 
   async update(id: string, data: UpdateUserData): Promise<User> {
+    const updateData: any = {};
+    if (data.username !== undefined) updateData.username = data.username;
+    if (data.firstName !== undefined) updateData.firstName = data.firstName;
+    if (data.lastName !== undefined) updateData.lastName = data.lastName;
+    if (data.activeChatId !== undefined) updateData.activeChatId = data.activeChatId;
+
     const record = await this.prisma.user.update({
       where: { id },
-      data: {
-        username: data.username,
-        firstName: data.firstName,
-        lastName: data.lastName,
-      },
+      data: updateData,
     });
     return this.toDomain(record);
   }
@@ -53,6 +56,7 @@ export class PrismaUserRepository implements IUserRepository {
     username: string | null;
     firstName: string | null;
     lastName: string | null;
+    activeChatId?: string | null;
     createdAt: Date;
     updatedAt: Date;
   }): User {
@@ -62,6 +66,7 @@ export class PrismaUserRepository implements IUserRepository {
       username: record.username,
       firstName: record.firstName,
       lastName: record.lastName,
+      activeChatId: record.activeChatId,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
     });

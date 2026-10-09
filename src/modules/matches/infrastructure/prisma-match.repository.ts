@@ -17,8 +17,15 @@ export class PrismaMatchRepository implements IMatchRepository {
   }
 
   async findByExternalMatchId(externalMatchId: string): Promise<Match | null> {
-    const record = await this.prisma.match.findUnique({
-      where: { externalMatchId },
+    const clean = externalMatchId.replace(/^(ref_|match_)/, '');
+    const record = await this.prisma.match.findFirst({
+      where: {
+        OR: [
+          { externalMatchId },
+          { externalMatchId: `match_${clean}` },
+          { externalMatchId: clean },
+        ],
+      },
     });
     if (!record) return null;
     return this.toDomain(record);
@@ -29,8 +36,8 @@ export class PrismaMatchRepository implements IMatchRepository {
       data: {
         externalMatchId: data.externalMatchId,
         user1Id: data.user1Id,
-        user2Id: data.user2Id,
-        status: data.status ?? MatchStatus.ACTIVE,
+        user2Id: data.user2Id ?? null,
+        status: data.status ?? (data.user2Id ? MatchStatus.ACTIVE : MatchStatus.PENDING),
         expiresAt: data.expiresAt ?? null,
       },
     });
@@ -45,11 +52,22 @@ export class PrismaMatchRepository implements IMatchRepository {
     return this.toDomain(record);
   }
 
+  async assignUser2(id: string, user2Id: string, status: MatchStatus = MatchStatus.ACTIVE): Promise<Match> {
+    const record = await this.prisma.match.update({
+      where: { id },
+      data: {
+        user2Id,
+        status,
+      },
+    });
+    return this.toDomain(record);
+  }
+
   private toDomain(record: {
     id: string;
     externalMatchId: string;
     user1Id: string;
-    user2Id: string;
+    user2Id: string | null;
     status: string;
     expiresAt: Date | null;
     createdAt: Date;

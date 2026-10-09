@@ -10,6 +10,11 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(3000),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   TELEGRAM_POLLING: z.string().optional().default('false'),
+  TELEGRAM_BOT_USERNAME: z
+    .string()
+    .optional()
+    .default('your_bot_username')
+    .transform((val) => val.trim().replace(/^@/, '') || 'your_bot_username'),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;
@@ -27,3 +32,12 @@ export function getEnvConfig(): EnvConfig {
   }
   return parsedEnv;
 }
+
+export function setBotUsername(username: string): void {
+  const clean = username.trim().replace(/^@/, '');
+  if (clean) {
+    const config = getEnvConfig();
+    config.TELEGRAM_BOT_USERNAME = clean;
+  }
+}
+

@@ -7,12 +7,14 @@ export interface CreateUserData {
   username?: string | null;
   firstName?: string | null;
   lastName?: string | null;
+  activeChatId?: string | null;
 }
 
 export interface UpdateUserData {
   username?: string | null;
   firstName?: string | null;
   lastName?: string | null;
+  activeChatId?: string | null;
 }
 
 export interface IUserRepository {

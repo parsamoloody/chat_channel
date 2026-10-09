@@ -1,8 +1,10 @@
-import { Injectable, Logger, Inject } from '@nestjs/common';
+import { Injectable, Logger, Inject, Optional } from '@nestjs/common';
 import { FindOrCreateTelegramUserUseCase } from '../../users/application/find-or-create-telegram-user.use-case';
 import { ProcessReferralUseCase } from '../../referrals/application/process-referral.use-case';
 import { ResolveMatchContextUseCase } from '../../matches/application/resolve-match-context.use-case';
 import { GetOrCreateMatchChatUseCase } from '../../chats/application/get-or-create-match-chat.use-case';
+import { UserActiveChatService } from '../../chats/application/user-active-chat.service';
+import { ExternalMatchPoolService } from '../../matches/application/external-match-pool.service';
 import {
   IReferralRepository,
   REFERRAL_REPOSITORY,
@@ -38,6 +40,7 @@ export interface HandleTelegramStartOutput {
   user: User;
   chatId?: string;
   matchedWithUserId?: string;
+  notifyPartnerUserId?: string;
 }
 
 @Injectable()
@@ -51,7 +54,12 @@ export class HandleTelegramStartUseCase {
     private readonly getOrCreateMatchChatUseCase: GetOrCreateMatchChatUseCase,
     @Inject(REFERRAL_REPOSITORY)
     private readonly referralRepository: IReferralRepository,
+    @Optional()
+    private readonly userActiveChatService?: UserActiveChatService,
+    @Optional()
+    private readonly matchPoolService?: ExternalMatchPoolService,
   ) {}
+
 
   async execute(input: HandleTelegramStartInput): Promise<HandleTelegramStartOutput> {
     this.logger.log(
@@ -100,28 +108,54 @@ export class HandleTelegramStartUseCase {
         requestingUserId: user.id,
       });
 
-      const { match, matchedWithUserId } = matchResult;
+      const { match, matchedWithUserId, isPendingWaitingForPartner, justConnectedPartner } = matchResult;
+
+      // If user 1 opened the link first, they are waiting for user 2 to join
+      if (isPendingWaitingForPartner) {
+        return {
+          status: 'CONNECTED',
+          message:
+            '⏳ شما با موفقیت به این لینک گفتگو متصل شدید!\n\nدر انتظار پیوستن هم‌صحبت شما... به محض اینکه طرف مقابل هم روی این لینک کلیک کند، چت خصوصی شما آغاز می‌شود.',
+          user,
+        };
+      }
 
       // 4. Create or retrieve hidden chat with both participants
       const { chat } = await this.getOrCreateMatchChatUseCase.execute({
         matchId: match.id,
-        participantUserIds: [match.user1Id, match.user2Id],
+        participantUserIds: [match.user1Id, match.user2Id!],
         title: `Match Chat (${match.externalMatchId})`,
       });
 
       // 5. Update referral status to RESOLVED
       await this.referralRepository.updateStatus(referral.id, ReferralStatus.RESOLVED);
 
+      if (this.userActiveChatService) {
+        this.userActiveChatService.setActiveChat(user.id, chat.id);
+        if (matchedWithUserId && !this.userActiveChatService.getActiveChat(matchedWithUserId)) {
+          this.userActiveChatService.setActiveChat(matchedWithUserId, chat.id);
+        }
+      }
+
       this.logger.log(`chat.resolved: chatId=${chat.id} matchId=${match.id} user=${user.id}`);
+
+      if (this.matchPoolService && referenceId) {
+        await this.matchPoolService.markMatchIdUsed(referenceId).catch(() => {});
+      }
+
+      const connectedMsg = justConnectedPartner
+        ? '🎉 هم‌صحبت شما منتظر شما بود! چت خصوصی شما آغاز شد. اکنون هر پیامی ارسال کنید به صورت مستقیم برای او ارسال می‌شود.'
+        : '🎉 شما به یک چت خصوصی با هم‌صحبت خود متصل شدید! هر پیامی که اینجا ارسال کنید به صورت خصوصی بین شما دو نفر خواهد بود.';
 
       return {
         status: isDuplicate ? 'ALREADY_CONNECTED' : 'CONNECTED',
         message: isDuplicate
           ? 'You are already connected to your private chat with your match! Send a message below to chat.'
-          : '🎉 You have been connected to a private hidden chat with your match! Any messages you send here are private between you two.',
+          : connectedMsg,
         user,
         chatId: chat.id,
-        matchedWithUserId,
+        matchedWithUserId: matchedWithUserId ?? undefined,
+        notifyPartnerUserId: justConnectedPartner && matchedWithUserId ? matchedWithUserId : undefined,
       };
     } catch (error: any) {
       // Mark referral as FAILED if error occurred

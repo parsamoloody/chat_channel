@@ -13,6 +13,7 @@ model User {
   username        String?
   firstName       String?
   lastName        String?
+  activeChatId    String?
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
@@ -46,9 +47,9 @@ model Match {
   externalMatchId String    @unique // Unique external identifier from Dating Bot
   user1Id         String
   user1           User      @relation("User1Matches", fields: [user1Id], references: [id], onDelete: Cascade)
-  user2Id         String
-  user2           User      @relation("User2Matches", fields: [user2Id], references: [id], onDelete: Cascade)
-  status          String    @default("ACTIVE") // "ACTIVE", "EXPIRED", "CANCELLED"
+  user2Id         String?
+  user2           User?     @relation("User2Matches", fields: [user2Id], references: [id], onDelete: Cascade)
+  status          String    @default("ACTIVE") // "ACTIVE", "PENDING", "EXPIRED", "CANCELLED"
   expiresAt       DateTime?
   createdAt       DateTime  @default(now())
   chat            Chat?
@@ -108,4 +109,15 @@ model AdminUser {
   apiKey    String   @unique
   role      String   @default("ADMIN")
   createdAt DateTime @default(now())
+}
+
+model ExternalMatchPool {
+  id              String    @id @default(uuid())
+  externalMatchId String    @unique
+  status          String    @default("AVAILABLE") // "AVAILABLE", "USED"
+  usedAt          DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([status])
+  @@index([externalMatchId])
 }

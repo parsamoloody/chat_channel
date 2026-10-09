@@ -5,7 +5,11 @@ import { getEnvConfig } from '../../infrastructure/config/env.config';
 export class AdminApiKeyGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest();
-    const apiKey = request.headers['x-admin-key'] || this.extractBearer(request.headers['authorization']);
+    const apiKey =
+      request.headers['x-admin-key'] ||
+      request.headers['x-api-key'] ||
+      request.headers['api-key'] ||
+      this.extractBearer(request.headers['authorization']);
 
     const validKey = getEnvConfig().ADMIN_API_KEY;
     if (!apiKey || apiKey !== validKey) {

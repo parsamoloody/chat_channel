@@ -7,6 +7,7 @@ export class User {
     public readonly lastName: string | null,
     public readonly createdAt: Date,
     public readonly updatedAt: Date,
+    public readonly activeChatId?: string | null,
   ) {}
 
   public static create(props: {
@@ -15,6 +16,7 @@ export class User {
     username?: string | null;
     firstName?: string | null;
     lastName?: string | null;
+    activeChatId?: string | null;
     createdAt?: Date;
     updatedAt?: Date;
   }): User {
@@ -26,6 +28,7 @@ export class User {
       props.lastName ?? null,
       props.createdAt ?? new Date(),
       props.updatedAt ?? new Date(),
+      props.activeChatId ?? null,
     );
   }
 }
