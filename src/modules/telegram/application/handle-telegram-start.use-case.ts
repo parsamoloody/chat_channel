@@ -5,6 +5,7 @@ import { ResolveMatchContextUseCase } from '../../matches/application/resolve-ma
 import { GetOrCreateMatchChatUseCase } from '../../chats/application/get-or-create-match-chat.use-case';
 import { UserActiveChatService } from '../../chats/application/user-active-chat.service';
 import { ExternalMatchPoolService } from '../../matches/application/external-match-pool.service';
+import { REPLY_TEXTS } from '../constants/reply-texts';
 import {
   IReferralRepository,
   REFERRAL_REPOSITORY,
@@ -85,7 +86,7 @@ export class HandleTelegramStartUseCase {
       this.logger.log(`User ${user.id} entered organically without referral`);
       return {
         status: 'ORGANIC',
-        message: 'Welcome! You entered without a match referral link. When you match with someone in our dating service, click their link to start a private chat.',
+        message: REPLY_TEXTS.START_ORGANIC,
         user,
       };
     }
@@ -95,7 +96,7 @@ export class HandleTelegramStartUseCase {
       this.logger.warn(`referral.invalid for user ${user.id}: ${parseResult.errorMessage}`);
       return {
         status: 'INVALID_REFERRAL',
-        message: 'The link you used is invalid or malformed. Please return to the Dating Bot and click the match link again.',
+        message: REPLY_TEXTS.START_INVALID_REFERRAL,
         user,
       };
     }
@@ -114,8 +115,7 @@ export class HandleTelegramStartUseCase {
       if (isPendingWaitingForPartner) {
         return {
           status: 'CONNECTED',
-          message:
-            '⏳ شما با موفقیت به این لینک گفتگو متصل شدید!\n\nدر انتظار پیوستن هم‌صحبت شما... به محض اینکه طرف مقابل هم روی این لینک کلیک کند، چت خصوصی شما آغاز می‌شود.',
+          message: REPLY_TEXTS.START_WAITING_FOR_PARTNER,
           user,
         };
       }
@@ -144,13 +144,13 @@ export class HandleTelegramStartUseCase {
       }
 
       const connectedMsg = justConnectedPartner
-        ? '🎉 هم‌صحبت شما منتظر شما بود! چت خصوصی شما آغاز شد. اکنون هر پیامی ارسال کنید به صورت مستقیم برای او ارسال می‌شود.'
-        : '🎉 شما به یک چت خصوصی با هم‌صحبت خود متصل شدید! هر پیامی که اینجا ارسال کنید به صورت خصوصی بین شما دو نفر خواهد بود.';
+        ? REPLY_TEXTS.START_PARTNER_WAITING
+        : REPLY_TEXTS.START_CONNECTED;
 
       return {
         status: isDuplicate ? 'ALREADY_CONNECTED' : 'CONNECTED',
         message: isDuplicate
-          ? 'You are already connected to your private chat with your match! Send a message below to chat.'
+          ? REPLY_TEXTS.START_ALREADY_CONNECTED
           : connectedMsg,
         user,
         chatId: chat.id,
@@ -165,7 +165,7 @@ export class HandleTelegramStartUseCase {
         this.logger.warn(`referral.not_found for user ${user.id}, referenceId ${referenceId}`);
         return {
           status: 'MATCH_NOT_FOUND',
-          message: 'No active match was found for this link. It may have been removed or already closed.',
+          message: REPLY_TEXTS.START_MATCH_NOT_FOUND,
           user,
         };
       }
@@ -174,7 +174,7 @@ export class HandleTelegramStartUseCase {
         this.logger.warn(`referral.expired for user ${user.id}, referenceId ${referenceId}`);
         return {
           status: 'MATCH_EXPIRED',
-          message: 'This match link has expired. Please check your Dating Bot for updated matches.',
+          message: REPLY_TEXTS.START_MATCH_EXPIRED,
           user,
         };
       }
@@ -183,7 +183,7 @@ export class HandleTelegramStartUseCase {
         this.logger.warn(`chat.access.denied for user ${user.id}, referenceId ${referenceId}`);
         return {
           status: 'UNAUTHORIZED',
-          message: 'You are not authorized to access this match chat.',
+          message: REPLY_TEXTS.START_UNAUTHORIZED,
           user,
         };
       }
@@ -191,7 +191,7 @@ export class HandleTelegramStartUseCase {
       this.logger.error(`Unexpected error resolving referral ${referenceId}: ${error.message}`, error.stack);
       return {
         status: 'INVALID_REFERRAL',
-        message: 'An unexpected error occurred while connecting your chat. Please try again later.',
+        message: REPLY_TEXTS.START_ERROR,
         user,
       };
     }

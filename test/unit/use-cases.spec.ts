@@ -6,6 +6,7 @@ import { SendMessageUseCase } from '../../src/modules/messages/application/send-
 import { GetChatMessagesUseCase } from '../../src/modules/messages/application/get-chat-messages.use-case';
 import { GetUserChatsUseCase } from '../../src/modules/chats/application/get-user-chats.use-case';
 import { HandleTelegramStartUseCase } from '../../src/modules/telegram/application/handle-telegram-start.use-case';
+import { REPLY_TEXTS } from '../../src/modules/telegram/constants/reply-texts';
 import { User } from '../../src/modules/users/domain/user.entity';
 import { Referral } from '../../src/modules/referrals/domain/referral.entity';
 import { Match } from '../../src/modules/matches/domain/match.entity';
@@ -522,7 +523,7 @@ describe('Application Use Cases Unit Tests', () => {
       });
 
       expect(result.status).toBe('ORGANIC');
-      expect(result.message).toContain('Welcome');
+      expect(result.message).toBe(REPLY_TEXTS.START_ORGANIC);
       expect(result.user.telegramUserId).toBe('tg_100');
     });
 
@@ -587,7 +588,7 @@ describe('Application Use Cases Unit Tests', () => {
       });
 
       expect(result.status).toBe('INVALID_REFERRAL');
-      expect(result.message).toContain('invalid or malformed');
+      expect(result.message).toBe(REPLY_TEXTS.START_INVALID_REFERRAL);
     });
 
     it('should handle non-existent match referral gracefully', async () => {
@@ -597,7 +598,7 @@ describe('Application Use Cases Unit Tests', () => {
       });
 
       expect(result.status).toBe('MATCH_NOT_FOUND');
-      expect(result.message).toContain('No active match was found');
+      expect(result.message).toBe(REPLY_TEXTS.START_MATCH_NOT_FOUND);
     });
 
     it('should deny access when user is not a participant in the match', async () => {
@@ -616,7 +617,7 @@ describe('Application Use Cases Unit Tests', () => {
       });
 
       expect(result.status).toBe('UNAUTHORIZED');
-      expect(result.message).toContain('not authorized');
+      expect(result.message).toBe(REPLY_TEXTS.START_UNAUTHORIZED);
     });
   });
 });

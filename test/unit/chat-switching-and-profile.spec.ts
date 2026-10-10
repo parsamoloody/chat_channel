@@ -11,6 +11,8 @@ import {
   ACTIVE_CHAT_KEYBOARD,
   NO_ACTIVE_CHAT_KEYBOARD,
   getMenuKeyboard,
+  BUTTON_TEXTS,
+  REPLY_TEXTS,
 } from '../../src/modules/telegram/infrastructure/telegram-bot.service';
 import { HandleTelegramStartUseCase } from '../../src/modules/telegram/application/handle-telegram-start.use-case';
 import { User } from '../../src/modules/users/domain/user.entity';
@@ -369,8 +371,8 @@ describe('Chat Switching and User Profile View Tests (TASK 1 & TASK 2)', () => {
     it('should have main menu keyboard with "نمایش پروفایل کاربر" and "چت ها"', () => {
       expect(MAIN_MENU_KEYBOARD).toBeDefined();
       const keyboardObj = JSON.parse(JSON.stringify(MAIN_MENU_KEYBOARD));
-      expect(keyboardObj.keyboard[0][0].text).toBe('نمایش پروفایل کاربر');
-      expect(keyboardObj.keyboard[0][1].text).toBe('چت ها');
+      expect(keyboardObj.keyboard[0][0].text).toBe(BUTTON_TEXTS.SHOW_PROFILE);
+      expect(keyboardObj.keyboard[0][1].text).toBe(BUTTON_TEXTS.CHATS);
     });
 
     it('should handle button click "نمایش پروفایل کاربر" via update', async () => {
@@ -453,7 +455,7 @@ describe('Chat Switching and User Profile View Tests (TASK 1 & TASK 2)', () => {
             message_id: 3,
             chat: { id: 777001, type: 'private' },
             date: Math.floor(Date.now() / 1000),
-            text: 'یک پیام از کاربر Charlie دارید',
+            text: REPLY_TEXTS.MESSAGE_NOTIFICATION('Charlie'),
           },
           data: 'switch_chat:c-2',
         },
@@ -496,23 +498,23 @@ describe('Chat Switching and User Profile View Tests (TASK 1 & TASK 2)', () => {
         expect(keyboardObj.keyboard.length).toBe(2);
         // Row 1: display user profile and list chats
         expect(keyboardObj.keyboard[0].length).toBe(2);
-        expect(keyboardObj.keyboard[0][0].text).toBe('نمایش پروفایل کاربر');
-        expect(keyboardObj.keyboard[0][1].text).toBe('چت ها');
+        expect(keyboardObj.keyboard[0][0].text).toBe(BUTTON_TEXTS.SHOW_PROFILE);
+        expect(keyboardObj.keyboard[0][1].text).toBe(BUTTON_TEXTS.CHATS);
         // Row 2: full-width terminate chat button
         expect(keyboardObj.keyboard[1].length).toBe(1);
-        expect(keyboardObj.keyboard[1][0].text).toBe('پایان چت');
+        expect(keyboardObj.keyboard[1][0].text).toBe(BUTTON_TEXTS.TERMINATE_CHAT);
       });
 
       it('NO_ACTIVE_CHAT_KEYBOARD should only have [چت ها] and omit profile and terminate buttons', () => {
         const keyboardObj = JSON.parse(JSON.stringify(NO_ACTIVE_CHAT_KEYBOARD));
         expect(keyboardObj.keyboard.length).toBe(1);
         expect(keyboardObj.keyboard[0].length).toBe(1);
-        expect(keyboardObj.keyboard[0][0].text).toBe('چت ها');
+        expect(keyboardObj.keyboard[0][0].text).toBe(BUTTON_TEXTS.CHATS);
 
         // Verify neither "نمایش پروفایل کاربر" nor "پایان چت" is present
         const allButtons = keyboardObj.keyboard.flat().map((b: any) => b.text);
-        expect(allButtons).not.toContain('نمایش پروفایل کاربر');
-        expect(allButtons).not.toContain('پایان چت');
+        expect(allButtons).not.toContain(BUTTON_TEXTS.SHOW_PROFILE);
+        expect(allButtons).not.toContain(BUTTON_TEXTS.TERMINATE_CHAT);
       });
 
       it('getMenuKeyboard helper returns correct keyboard based on active chat state', () => {
@@ -652,7 +654,7 @@ describe('Chat Switching and User Profile View Tests (TASK 1 & TASK 2)', () => {
               message_id: 103,
               chat: { id: 999001, type: 'private' },
               date: Math.floor(Date.now() / 1000),
-              text: 'آیا مطمئن هستید که می‌خواهید چت با Bob را پایان دهید؟',
+              text: REPLY_TEXTS.TERMINATE_CONFIRM_PROMPT('Bob'),
             },
             data: 'cancel_terminate',
           },
@@ -691,7 +693,7 @@ describe('Chat Switching and User Profile View Tests (TASK 1 & TASK 2)', () => {
               message_id: 104,
               chat: { id: 999001, type: 'private' },
               date: Math.floor(Date.now() / 1000),
-              text: 'آیا مطمئن هستید که می‌خواهید چت با Bob را پایان دهید؟',
+              text: REPLY_TEXTS.TERMINATE_CONFIRM_PROMPT('Bob'),
             },
             data: 'confirm_terminate:c-1',
           },
@@ -738,7 +740,7 @@ describe('Chat Switching and User Profile View Tests (TASK 1 & TASK 2)', () => {
               message_id: 105,
               chat: { id: 999001, type: 'private' },
               date: Math.floor(Date.now() / 1000),
-              text: 'آیا مطمئن هستید که می‌خواهید چت با Bob را پایان دهید؟',
+              text: REPLY_TEXTS.TERMINATE_CONFIRM_PROMPT('Bob'),
             },
             data: 'confirm_terminate:c-1',
           },

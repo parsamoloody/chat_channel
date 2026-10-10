@@ -10,16 +10,21 @@ import { UserActiveChatService } from '../../chats/application/user-active-chat.
 import { IMessageRepository, MESSAGE_REPOSITORY } from '../../messages/domain/message.repository.interface';
 import { IUserRepository, USER_REPOSITORY } from '../../users/domain/user.repository.interface';
 import { getEnvConfig, setBotUsername } from '../../../shared/infrastructure/config/env.config';
+import { BUTTON_TEXTS, RAW_BUTTON_TEXTS } from '../constants/button-texts';
+import { REPLY_TEXTS } from '../constants/reply-texts';
+
+export { BUTTON_TEXTS, RAW_BUTTON_TEXTS } from '../constants/button-texts';
+export { REPLY_TEXTS } from '../constants/reply-texts';
 
 export const ACTIVE_CHAT_KEYBOARD = new Keyboard()
-  .text('نمایش پروفایل کاربر')
-  .text('چت ها')
+  .text(BUTTON_TEXTS.SHOW_PROFILE)
+  .text(BUTTON_TEXTS.CHATS)
   .row()
-  .text('پایان چت')
+  .text(BUTTON_TEXTS.TERMINATE_CHAT)
   .resized();
 
 export const NO_ACTIVE_CHAT_KEYBOARD = new Keyboard()
-  .text('چت ها')
+  .text(BUTTON_TEXTS.CHATS)
   .resized();
 
 export const MAIN_MENU_KEYBOARD = ACTIVE_CHAT_KEYBOARD;
@@ -133,7 +138,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       if (from) {
         hasActiveChat = await this.isUserInActiveChat(String(from.id));
       }
-      await ctx.reply('منوی چت:', { reply_markup: getMenuKeyboard(hasActiveChat) });
+      await ctx.reply(REPLY_TEXTS.CHAT_MENU_TITLE, { reply_markup: getMenuKeyboard(hasActiveChat) });
     });
 
     // 4. Callback query for switching chats: switch_chat:<chatId>
@@ -153,7 +158,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     });
 
     this.bot.callbackQuery('cancel_terminate', async (ctx) => {
-      await ctx.answerCallbackQuery({ text: 'عملیات پایان چت لغو شد.' }).catch(() => {});
+      await ctx.answerCallbackQuery({ text: REPLY_TEXTS.TERMINATE_CANCELLED }).catch(() => {});
       await ctx.deleteMessage().catch(() => {});
     });
 
@@ -164,19 +169,19 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       const text = ctx.message.text.trim();
 
       // TASK 1 Button: نمایش پروفایل کاربر
-      if (text === 'نمایش پروفایل کاربر') {
+      if (text === BUTTON_TEXTS.SHOW_PROFILE || text === RAW_BUTTON_TEXTS.SHOW_PROFILE) {
         await this.handleShowProfile(ctx);
         return;
       }
 
       // TASK 2 Button: چت ها
-      if (text === 'چت ها') {
+      if (text === BUTTON_TEXTS.CHATS || text === RAW_BUTTON_TEXTS.CHATS) {
         await this.handleListChats(ctx);
         return;
       }
 
       // TASK 1 Button: پایان چت
-      if (text === 'پایان چت') {
+      if (text === BUTTON_TEXTS.TERMINATE_CHAT || text === RAW_BUTTON_TEXTS.TERMINATE_CHAT) {
         await this.handleTerminateChatPrompt(ctx);
         return;
       }
@@ -197,19 +202,19 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
               // Recipient is active in the same chat -> direct message relay
               await this.bot.api.sendMessage(
                 result.recipientTelegramUserId,
-                `💬 ${ctx.message.text}`,
+                REPLY_TEXTS.RELAY_MESSAGE(ctx.message.text),
               );
             } else {
               // TASK 2: If recipient was chatting with another user, send notification with switch button
               // Message format: یک پیام از کاربر [name] دارید
               const switchKeyboard = new InlineKeyboard().text(
-                `💬 رفتن به چت با ${result.senderName}`,
+                BUTTON_TEXTS.SWITCH_TO_CHAT(result.senderName),
                 `switch_chat:${result.chatId}`,
               );
 
               await this.bot.api.sendMessage(
                 result.recipientTelegramUserId,
-                `یک پیام از کاربر ${result.senderName} دارید`,
+                REPLY_TEXTS.MESSAGE_NOTIFICATION(result.senderName ?? REPLY_TEXTS.DEFAULT_USER_NAME),
                 {
                   reply_markup: switchKeyboard,
                 },
@@ -271,7 +276,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
           if (partner?.telegramUserId) {
             await this.bot.api.sendMessage(
               partner.telegramUserId,
-              '🎉 هم‌صحبت شما به چت پیوست! اکنون می‌توانید با ارسال پیام، گفتگو را آغاز کنید.',
+              REPLY_TEXTS.PARTNER_JOINED_CHAT,
               { reply_markup: ACTIVE_CHAT_KEYBOARD },
             );
           }
@@ -281,7 +286,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       }
     } catch (err: any) {
       this.logger.error(`Error in /start command: ${err.message}`, err.stack);
-      await ctx.reply('An unexpected error occurred. Please try again later.', {
+      await ctx.reply(REPLY_TEXTS.UNEXPECTED_ERROR, {
         reply_markup: NO_ACTIVE_CHAT_KEYBOARD,
       });
     }
@@ -300,7 +305,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
 
       if (!result.success || !result.partnerUser) {
         await ctx.reply(
-          'شما در حال حاضر در هیچ چت فعالی نیستید. لطفاً ابتدا از دکمه «چت ها» یک گفتگو را انتخاب کنید.',
+          REPLY_TEXTS.PROFILE_NO_ACTIVE_CHAT,
           { reply_markup: NO_ACTIVE_CHAT_KEYBOARD },
         );
         return;
@@ -315,7 +320,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
         if (photos && photos.total_count > 0 && photos.photos.length > 0 && photos.photos[0].length > 0) {
           const highestResPhoto = photos.photos[0][photos.photos[0].length - 1];
           await this.bot.api.sendPhoto(ctx.chat!.id, highestResPhoto.file_id, {
-            caption: `👤 نام کاربر: ${partnerName}`,
+            caption: REPLY_TEXTS.PROFILE_CAPTION(partnerName),
             reply_markup: ACTIVE_CHAT_KEYBOARD,
           });
           return;
@@ -326,12 +331,12 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
 
       // Fallback when photo is missing or privacy restricted
       await ctx.reply(
-        `👤 نام کاربر: ${partnerName}\n(این کاربر تصویر پروفایل ندارد یا نمایش آن را در تنظیمات تلگرام محدود کرده است)`,
+        REPLY_TEXTS.PROFILE_NO_PHOTO_CAPTION(partnerName),
         { reply_markup: ACTIVE_CHAT_KEYBOARD },
       );
     } catch (err: any) {
       this.logger.error(`Error in handleShowProfile: ${err.message}`, err.stack);
-      await ctx.reply('خطایی در دریافت اطلاعات پروفایل رخ داد.', { reply_markup: NO_ACTIVE_CHAT_KEYBOARD });
+      await ctx.reply(REPLY_TEXTS.PROFILE_FETCH_ERROR, { reply_markup: NO_ACTIVE_CHAT_KEYBOARD });
     }
   }
 
@@ -348,7 +353,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
 
       if (!result.success || result.chats.length === 0) {
         await ctx.reply(
-          'شما در حال حاضر هیچ چت فعالی ندارید. برای شروع گفتگو باید از طریق لینک همسان‌سازی وارد شوید.',
+          REPLY_TEXTS.CHATS_NO_ACTIVE,
           { reply_markup: NO_ACTIVE_CHAT_KEYBOARD },
         );
         return;
@@ -356,17 +361,19 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
 
       const keyboard = new InlineKeyboard();
       for (const item of result.chats) {
-        const activeLabel = item.isCurrentActive ? ' (فعال)' : '';
-        keyboard.text(`💬 ${item.partnerName}${activeLabel}`, `switch_chat:${item.chatId}`).row();
+        keyboard.text(
+          BUTTON_TEXTS.CHAT_LIST_ITEM(item.partnerName, item.isCurrentActive),
+          `switch_chat:${item.chatId}`,
+        ).row();
       }
-      keyboard.text('❌ بستن لیست', 'close_chat_list');
+      keyboard.text(BUTTON_TEXTS.CLOSE_CHAT_LIST, 'close_chat_list');
 
-      await ctx.reply('📋 چت‌های شما:\nبرای گفتگو، کاربر مورد نظر را انتخاب کنید:', {
+      await ctx.reply(REPLY_TEXTS.CHATS_LIST_TITLE, {
         reply_markup: keyboard,
       });
     } catch (err: any) {
       this.logger.error(`Error in handleListChats: ${err.message}`, err.stack);
-      await ctx.reply('خطایی در دریافت لیست چت‌ها رخ داد.', { reply_markup: NO_ACTIVE_CHAT_KEYBOARD });
+      await ctx.reply(REPLY_TEXTS.CHATS_FETCH_ERROR, { reply_markup: NO_ACTIVE_CHAT_KEYBOARD });
     }
   }
 
@@ -381,7 +388,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     const targetChatId = (ctx as any).match?.[1];
 
     if (!targetChatId) {
-      await ctx.answerCallbackQuery({ text: 'شناسه چت نامعتبر است.' });
+      await ctx.answerCallbackQuery({ text: REPLY_TEXTS.INVALID_CHAT_ID });
       return;
     }
 
@@ -393,16 +400,16 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
 
       if (!result.success) {
         await ctx.answerCallbackQuery({
-          text: 'دسترسی به این چت امکان‌پذیر نیست یا چت یافت نشد.',
+          text: REPLY_TEXTS.CHAT_ACCESS_DENIED,
           show_alert: true,
         });
         return;
       }
 
-      await ctx.answerCallbackQuery({ text: `ورود به چت با ${result.partnerName}` });
+      await ctx.answerCallbackQuery({ text: REPLY_TEXTS.SWITCH_CHAT_ALERT(result.partnerName ?? REPLY_TEXTS.DEFAULT_USER_NAME) });
 
       await ctx.reply(
-        `✅ شما وارد چت با **${result.partnerName}** شدید.\nاز این پس پیام‌های ارسالی شما به این کاربر تحویل داده می‌شود.`,
+        REPLY_TEXTS.SWITCH_CHAT_SUCCESS(result.partnerName ?? REPLY_TEXTS.DEFAULT_USER_NAME),
         {
           reply_markup: ACTIVE_CHAT_KEYBOARD,
           parse_mode: 'Markdown',
@@ -417,7 +424,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
             const lastMsg = history.messages[0];
             const currentUser = await this.userRepository?.findByTelegramUserId(telegramUserId);
             if (currentUser && lastMsg.senderId !== currentUser.id) {
-              await ctx.reply(`📩 آخرین پیام دریافتی از ${result.partnerName}:\n💬 ${lastMsg.content}`);
+              await ctx.reply(REPLY_TEXTS.LAST_RECEIVED_MESSAGE(result.partnerName ?? REPLY_TEXTS.DEFAULT_USER_NAME, lastMsg.content));
             }
           }
         } catch {
@@ -426,7 +433,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       }
     } catch (err: any) {
       this.logger.error(`Error in handleSwitchChatCallback: ${err.message}`, err.stack);
-      await ctx.answerCallbackQuery({ text: 'خطایی در تغییر چت رخ داد.', show_alert: true });
+      await ctx.answerCallbackQuery({ text: REPLY_TEXTS.SWITCH_CHAT_ERROR, show_alert: true });
     }
   }
 
@@ -442,25 +449,25 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       const activePartnerResult = await this.getUserActiveChatPartnerUseCase.execute({ telegramUserId });
 
       if (!activePartnerResult.success || !activePartnerResult.partnerUser || !activePartnerResult.chatId) {
-        await ctx.reply('شما در حال حاضر در هیچ چت فعالی نیستید.', {
+        await ctx.reply(REPLY_TEXTS.TERMINATE_NO_ACTIVE_CHAT, {
           reply_markup: NO_ACTIVE_CHAT_KEYBOARD,
         });
         return;
       }
 
-      const partnerName = activePartnerResult.partnerName ?? 'کاربر';
+      const partnerName = activePartnerResult.partnerName ?? REPLY_TEXTS.DEFAULT_USER_NAME;
       const chatId = activePartnerResult.chatId;
 
       const confirmKeyboard = new InlineKeyboard()
-        .text('بله، مطمئنم', `confirm_terminate:${chatId}`)
-        .text('خیر', 'cancel_terminate');
+        .text(BUTTON_TEXTS.CONFIRM_TERMINATE, `confirm_terminate:${chatId}`)
+        .text(BUTTON_TEXTS.CANCEL_TERMINATE, 'cancel_terminate');
 
-      await ctx.reply(`آیا مطمئن هستید که می‌خواهید چت با ${partnerName} را پایان دهید؟`, {
+      await ctx.reply(REPLY_TEXTS.TERMINATE_CONFIRM_PROMPT(partnerName), {
         reply_markup: confirmKeyboard,
       });
     } catch (err: any) {
       this.logger.error(`Error in handleTerminateChatPrompt: ${err.message}`, err.stack);
-      await ctx.reply('خطایی در درخواست پایان چت رخ داد.', {
+      await ctx.reply(REPLY_TEXTS.TERMINATE_PROMPT_ERROR, {
         reply_markup: NO_ACTIVE_CHAT_KEYBOARD,
       });
     }
@@ -477,7 +484,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     const targetChatId = (ctx as any).match?.[1];
 
     if (!targetChatId) {
-      await ctx.answerCallbackQuery({ text: 'شناسه چت نامعتبر است.' });
+      await ctx.answerCallbackQuery({ text: REPLY_TEXTS.INVALID_CHAT_ID });
       return;
     }
 
@@ -485,7 +492,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     await ctx.deleteMessage().catch(() => {});
 
     if (!this.terminateChatUseCase) {
-      await ctx.reply('سیستم پایان چت در دسترس نیست.', {
+      await ctx.reply(REPLY_TEXTS.TERMINATE_SYSTEM_UNAVAILABLE, {
         reply_markup: NO_ACTIVE_CHAT_KEYBOARD,
       });
       return;
@@ -498,20 +505,20 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       });
 
       if (!termResult.success) {
-        await ctx.reply('خطا در پایان چت یا شما عضو این چت نیستید.', {
+        await ctx.reply(REPLY_TEXTS.TERMINATE_FORBIDDEN, {
           reply_markup: NO_ACTIVE_CHAT_KEYBOARD,
         });
         return;
       }
 
-      const partnerName = termResult.partnerName ?? 'کاربر';
-      const terminatorName = termResult.terminatorName ?? 'کاربر';
+      const partnerName = termResult.partnerName ?? REPLY_TEXTS.DEFAULT_USER_NAME;
+      const terminatorName = termResult.terminatorName ?? REPLY_TEXTS.DEFAULT_USER_NAME;
       const partnerTgId = termResult.partnerTelegramUserId;
 
       // 1. Process post-termination for initiator (User A)
       await this.processUserPostTermination({
         telegramUserId,
-        notificationMessage: `کاربر ${partnerName} چت را بست`,
+        notificationMessage: REPLY_TEXTS.CHAT_CLOSED_BY_USER(partnerName),
         ctx,
       });
 
@@ -519,12 +526,12 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       if (partnerTgId) {
         await this.processUserPostTermination({
           telegramUserId: partnerTgId,
-          notificationMessage: `کاربر ${terminatorName} چت را بست`,
+          notificationMessage: REPLY_TEXTS.CHAT_CLOSED_BY_USER(terminatorName),
         });
       }
     } catch (err: any) {
       this.logger.error(`Error in handleConfirmTerminateCallback: ${err.message}`, err.stack);
-      await ctx.reply('خطایی در پایان چت رخ داد.', { reply_markup: NO_ACTIVE_CHAT_KEYBOARD });
+      await ctx.reply(REPLY_TEXTS.TERMINATE_ERROR, { reply_markup: NO_ACTIVE_CHAT_KEYBOARD });
     }
   }
 
@@ -576,7 +583,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
 
       await sendMessage(notificationMessage);
       await sendMessage(
-        `✅ شما به چت با ${nextChat.partnerName} منتقل شدید.`,
+        REPLY_TEXTS.AUTO_SWITCH_SUCCESS(nextChat.partnerName),
         ACTIVE_CHAT_KEYBOARD,
       );
     } else if (availableChats.length > 1) {
@@ -585,11 +592,14 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
 
       const keyboard = new InlineKeyboard();
       for (const item of availableChats) {
-        keyboard.text(`💬 ${item.partnerName}`, `switch_chat:${item.chatId}`).row();
+        keyboard.text(
+          BUTTON_TEXTS.CHAT_LIST_ITEM(item.partnerName),
+          `switch_chat:${item.chatId}`,
+        ).row();
       }
-      keyboard.text('❌ بستن لیست', 'close_chat_list');
+      keyboard.text(BUTTON_TEXTS.CLOSE_CHAT_LIST, 'close_chat_list');
 
-      await sendMessage('📋 چت‌های شما:\nبرای گفتگو، کاربر مورد نظر را انتخاب کنید:', keyboard);
+      await sendMessage(REPLY_TEXTS.CHATS_LIST_TITLE, keyboard);
     } else {
       // 0 available chats
       await sendMessage(notificationMessage, NO_ACTIVE_CHAT_KEYBOARD);

@@ -2,6 +2,7 @@ import { Injectable, Logger, Inject, Optional } from '@nestjs/common';
 import { IUserRepository, USER_REPOSITORY } from '../../users/domain/user.repository.interface';
 import { IChatRepository, CHAT_REPOSITORY } from '../../chats/domain/chat.repository.interface';
 import { UserActiveChatService } from '../../chats/application/user-active-chat.service';
+import { REPLY_TEXTS } from '../constants/reply-texts';
 import { SendMessageUseCase } from '../../messages/application/send-message.use-case';
 import { Message } from '../../messages/domain/message.entity';
 import { Chat } from '../../chats/domain/chat.entity';
@@ -63,7 +64,7 @@ export class HandleTelegramMessageUseCase {
     if (validChats.length === 0) {
       return {
         success: false,
-        responseToSender: 'شما در حال حاضر هیچ چت فعالی ندارید. لطفاً ابتدا از طریق لینک همسان‌سازی وارد شوید.',
+        responseToSender: REPLY_TEXTS.NO_ACTIVE_CHAT_RELAY_ERROR,
       };
     }
 
@@ -96,7 +97,7 @@ export class HandleTelegramMessageUseCase {
       const senderName =
         [user.firstName, user.lastName].filter(Boolean).join(' ') ||
         user.username ||
-        'کاربر';
+        REPLY_TEXTS.DEFAULT_USER_NAME;
 
       const recipientUser = await this.userRepository.findById(activeChatEntry.partnerId);
       if (recipientUser) {
@@ -104,7 +105,7 @@ export class HandleTelegramMessageUseCase {
         recipientName =
           [recipientUser.firstName, recipientUser.lastName].filter(Boolean).join(' ') ||
           recipientUser.username ||
-          'کاربر';
+          REPLY_TEXTS.DEFAULT_USER_NAME;
 
         // Count valid chats for recipient
         const recipientAllChats = await this.chatRepository.findUserChats(recipientUser.id, true);
