@@ -1,6 +1,8 @@
-import { Injectable, Inject, Logger } from '@nestjs/common';
+import { Injectable, Inject, Logger, Optional } from '@nestjs/common';
 import { IUserRepository, USER_REPOSITORY } from '../../users/domain/user.repository.interface';
 import { IChatRepository, CHAT_REPOSITORY } from '../domain/chat.repository.interface';
+import { IMatchRepository, MATCH_REPOSITORY } from '../../matches/domain/match.repository.interface';
+import { MatchStatus } from '../../matches/domain/match-status.enum';
 import { UserActiveChatService } from './user-active-chat.service';
 import { User } from '../../users/domain/user.entity';
 
@@ -26,6 +28,9 @@ export class GetUserActiveChatPartnerUseCase {
     @Inject(CHAT_REPOSITORY)
     private readonly chatRepository: IChatRepository,
     private readonly userActiveChatService: UserActiveChatService,
+    @Optional()
+    @Inject(MATCH_REPOSITORY)
+    private readonly matchRepository?: IMatchRepository,
   ) {}
 
   async execute(input: GetUserActiveChatPartnerInput): Promise<GetUserActiveChatPartnerOutput> {
@@ -47,12 +52,26 @@ export class GetUserActiveChatPartnerUseCase {
 
     // Determine current active chat ID
     let activeChatId = this.userActiveChatService.getActiveChat(user.id);
+    if (activeChatId && this.userActiveChatService.isChatTerminated(activeChatId)) {
+      activeChatId = undefined;
+    }
+
     let fullChat = activeChatId ? await this.chatRepository.findWithParticipants(activeChatId) : null;
     let partnerParticipant = fullChat?.participants.find((p) => p.userId !== user.id);
 
     // If activeChatId was invalid, not set, or had no partner, search for first valid chat
     if (!partnerParticipant) {
       for (const chat of userChats) {
+        if (this.userActiveChatService.isChatTerminated(chat.id)) {
+          continue;
+        }
+        if (this.matchRepository && chat.matchId) {
+          const match = await this.matchRepository.findById(chat.matchId);
+          if (match && match.status === MatchStatus.CANCELLED) {
+            continue;
+          }
+        }
+
         const fc = await this.chatRepository.findWithParticipants(chat.id);
         const p = fc?.participants.find((part) => part.userId !== user.id);
         if (p) {

@@ -47,6 +47,14 @@ export class SwitchUserActiveChatUseCase {
       };
     }
 
+    if (this.userActiveChatService.isChatTerminated(input.targetChatId)) {
+      this.logger.warn(`User ${user.id} tried to switch to terminated chat ${input.targetChatId}`);
+      return {
+        success: false,
+        error: 'CHAT_TERMINATED',
+      };
+    }
+
     // Set new active chat
     this.userActiveChatService.setActiveChat(user.id, input.targetChatId);
     this.logger.log(`Switched active chat for user ${user.id} to ${input.targetChatId}`);

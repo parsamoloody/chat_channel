@@ -15,6 +15,8 @@ export interface TerminateChatOutput {
   error?: string;
   partnerName?: string;
   partnerTelegramUserId?: string;
+  terminatorName?: string;
+  terminatorTelegramUserId?: string;
 }
 
 @Injectable()
@@ -50,6 +52,11 @@ export class TerminateChatUseCase {
       return { success: false, error: 'CHAT_NOT_FOUND' };
     }
 
+    const terminatorName =
+      [user.firstName, user.lastName].filter(Boolean).join(' ') ||
+      user.username ||
+      'کاربر';
+
     const partnerParticipant = chatWithParticipants.participants.find((p) => p.userId !== user.id);
     let partnerName = 'کاربر';
     let partnerTelegramUserId: string | undefined;
@@ -81,6 +88,9 @@ export class TerminateChatUseCase {
       }
     }
 
+    // Mark chat terminated in userActiveChatService
+    this.userActiveChatService.markChatTerminated(input.chatId);
+
     // Clear the user's active chat
     const userActiveChat = this.userActiveChatService.getActiveChat(user.id);
     if (userActiveChat === input.chatId) {
@@ -93,6 +103,8 @@ export class TerminateChatUseCase {
       success: true,
       partnerName,
       partnerTelegramUserId,
+      terminatorName,
+      terminatorTelegramUserId: user.telegramUserId,
     };
   }
 }

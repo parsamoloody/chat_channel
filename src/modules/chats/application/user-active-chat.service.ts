@@ -7,6 +7,7 @@ import * as path from 'path';
 export class UserActiveChatService implements OnModuleInit {
   private readonly logger = new Logger(UserActiveChatService.name);
   private readonly activeChats = new Map<string, string>(); // userId -> chatId
+  private readonly terminatedChats = new Set<string>(); // chatId
   private readonly storageFilePath = path.resolve(process.cwd(), '.active_chats.json');
 
   constructor(@Optional() private readonly prisma?: PrismaService) {}
@@ -102,8 +103,22 @@ export class UserActiveChatService implements OnModuleInit {
     }
   }
 
+  markChatTerminated(chatId: string): void {
+    this.terminatedChats.add(chatId);
+    for (const [userId, cId] of this.activeChats.entries()) {
+      if (cId === chatId) {
+        this.clearActiveChat(userId);
+      }
+    }
+  }
+
+  isChatTerminated(chatId: string): boolean {
+    return this.terminatedChats.has(chatId);
+  }
+
   clearAll(): void {
     this.activeChats.clear();
+    this.terminatedChats.clear();
     this.persistStateToFile();
   }
 }

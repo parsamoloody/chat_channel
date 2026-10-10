@@ -1,6 +1,8 @@
-import { Injectable, Inject, Logger } from '@nestjs/common';
+import { Injectable, Inject, Logger, Optional } from '@nestjs/common';
 import { IUserRepository, USER_REPOSITORY } from '../../users/domain/user.repository.interface';
 import { IChatRepository, CHAT_REPOSITORY } from '../domain/chat.repository.interface';
+import { IMatchRepository, MATCH_REPOSITORY } from '../../matches/domain/match.repository.interface';
+import { MatchStatus } from '../../matches/domain/match-status.enum';
 import { UserActiveChatService } from './user-active-chat.service';
 import { User } from '../../users/domain/user.entity';
 
@@ -13,6 +15,7 @@ export interface ChatListItem {
 
 export interface GetUserChatListInput {
   telegramUserId: string;
+  autoSelectIfNone?: boolean;
 }
 
 export interface GetUserChatListOutput {
@@ -32,6 +35,9 @@ export class GetUserChatListUseCase {
     @Inject(CHAT_REPOSITORY)
     private readonly chatRepository: IChatRepository,
     private readonly userActiveChatService: UserActiveChatService,
+    @Optional()
+    @Inject(MATCH_REPOSITORY)
+    private readonly matchRepository?: IMatchRepository,
   ) {}
 
   async execute(input: GetUserChatListInput): Promise<GetUserChatListOutput> {
@@ -59,6 +65,18 @@ export class GetUserChatListUseCase {
     const items: ChatListItem[] = [];
 
     for (const chat of userChats) {
+      // Ignore terminated chats
+      if (this.userActiveChatService.isChatTerminated(chat.id)) {
+        continue;
+      }
+
+      if (this.matchRepository && chat.matchId) {
+        const match = await this.matchRepository.findById(chat.matchId);
+        if (match && match.status === MatchStatus.CANCELLED) {
+          continue;
+        }
+      }
+
       const fullChat = await this.chatRepository.findWithParticipants(chat.id);
       const partnerParticipant = fullChat?.participants.find((p) => p.userId !== user.id);
 
@@ -89,16 +107,23 @@ export class GetUserChatListUseCase {
       };
     }
 
-    // If activeChatId was not set or was pointing to an invalid/orphaned chat, pick first valid chat
-    if (!activeChatId || !items.some((i) => i.chatId === activeChatId)) {
-      activeChatId = items[0].chatId;
-      this.userActiveChatService.setActiveChat(user.id, activeChatId);
-      items[0].isCurrentActive = true;
+    const autoSelect = input.autoSelectIfNone ?? true;
+    if (autoSelect) {
+      // If activeChatId was not set or was pointing to an invalid/orphaned chat, pick first valid chat
+      if (!activeChatId || !items.some((i) => i.chatId === activeChatId)) {
+        activeChatId = items[0].chatId;
+        this.userActiveChatService.setActiveChat(user.id, activeChatId);
+        items[0].isCurrentActive = true;
+      }
+    } else {
+      if (!items.some((i) => i.chatId === activeChatId)) {
+        activeChatId = undefined;
+      }
     }
 
     return {
       success: true,
-      currentActiveChatId: activeChatId,
+      currentActiveChatId: activeChatId ?? null,
       chats: items,
     };
   }

@@ -50,6 +50,9 @@ export class HandleTelegramMessageUseCase {
     const validChats: { chat: Chat; partnerId: string }[] = [];
 
     for (const c of allUserChats) {
+      if (this.userActiveChatService?.isChatTerminated(c.id)) {
+        continue;
+      }
       const fc = await this.chatRepository.findWithParticipants(c.id);
       const other = fc?.participants.find((p) => p.userId !== user.id);
       if (other) {
@@ -107,6 +110,9 @@ export class HandleTelegramMessageUseCase {
         const recipientAllChats = await this.chatRepository.findUserChats(recipientUser.id, true);
         let recipientValidChatCount = 0;
         for (const rc of recipientAllChats) {
+          if (this.userActiveChatService?.isChatTerminated(rc.id)) {
+            continue;
+          }
           const rfc = await this.chatRepository.findWithParticipants(rc.id);
           if (rfc?.participants.some((p) => p.userId !== recipientUser.id)) {
             recipientValidChatCount++;
