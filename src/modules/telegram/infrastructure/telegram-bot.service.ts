@@ -56,7 +56,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
         id: 100000000,
         is_bot: true,
         first_name: 'HiddenChatBot',
-        username: 'hidden_chat_bot',
+        username: getEnvConfig().TELEGRAM_BOT_USERNAME,
         can_join_groups: false,
         can_read_all_group_messages: false,
         supports_inline_queries: false,
