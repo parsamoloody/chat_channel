@@ -1,6 +1,6 @@
-import { Injectable, Logger, Inject, Optional } from '@nestjs/common';
-import { IUserRepository, USER_REPOSITORY } from '../../users/domain/user.repository.interface';
-import { IChatRepository, CHAT_REPOSITORY } from '../../chats/domain/chat.repository.interface';
+import { Logger } from '../../../shared/infrastructure/logger';
+import { IUserRepository } from '../../users/domain/user.repository.interface';
+import { IChatRepository } from '../../chats/domain/chat.repository.interface';
 import { UserActiveChatService } from '../../chats/application/user-active-chat.service';
 import { SendMessageUseCase } from '../../messages/application/send-message.use-case';
 import { Message } from '../../messages/domain/message.entity';
@@ -22,17 +22,13 @@ export interface HandleTelegramMessageOutput {
   responseToSender: string;
 }
 
-@Injectable()
 export class HandleTelegramMessageUseCase {
   private readonly logger = new Logger(HandleTelegramMessageUseCase.name);
 
   constructor(
-    @Inject(USER_REPOSITORY)
     private readonly userRepository: IUserRepository,
-    @Inject(CHAT_REPOSITORY)
     private readonly chatRepository: IChatRepository,
     private readonly sendMessageUseCase: SendMessageUseCase,
-    @Optional()
     private readonly userActiveChatService?: UserActiveChatService,
   ) {}
 
@@ -41,12 +37,12 @@ export class HandleTelegramMessageUseCase {
     if (!user) {
       return {
         success: false,
-        responseToSender: 'Please click the link from your Dating Bot first to start your chat.',
+        responseToSender: 'لطفاً ابتدا از طریق لینک همسان‌سازی وارد شوید.',
       };
     }
 
     // Find all chats for this user and filter for valid chats with a partner
-    const allUserChats = await this.chatRepository.findUserChats(user.id, true);
+    const allUserChats = await this.chatRepository.findUserChats(user.id);
     const validChats: { chat: Chat; partnerId: string }[] = [];
 
     for (const c of allUserChats) {
@@ -63,7 +59,7 @@ export class HandleTelegramMessageUseCase {
     if (validChats.length === 0) {
       return {
         success: false,
-        responseToSender: 'شما در حال حاضر هیچ چت فعالی ندارید. لطفاً ابتدا از طریق لینک همسان‌سازی وارد شوید.',
+        responseToSender: 'شما در حال حاضر هیچ چت فعالی ندارید. لطفاً ابتدا از طریق کلید همسان‌سازی وارد شوید.',
       };
     }
 
@@ -107,7 +103,7 @@ export class HandleTelegramMessageUseCase {
           'کاربر';
 
         // Count valid chats for recipient
-        const recipientAllChats = await this.chatRepository.findUserChats(recipientUser.id, true);
+        const recipientAllChats = await this.chatRepository.findUserChats(recipientUser.id);
         let recipientValidChatCount = 0;
         for (const rc of recipientAllChats) {
           if (this.userActiveChatService?.isChatTerminated(rc.id)) {

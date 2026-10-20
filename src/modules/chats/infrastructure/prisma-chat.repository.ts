@@ -1,19 +1,17 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../../../shared/infrastructure/database/prisma.service';
+import { PrismaClient } from '@prisma/client';
+import { Logger } from '../../../shared/infrastructure/logger';
 import { Chat } from '../domain/chat.entity';
 import { ChatParticipant } from '../domain/chat-participant.entity';
-import { ChatVisibility, ChatParticipantRole } from '../domain/chat-visibility.enum';
 import {
   IChatRepository,
   CreateChatWithParticipantsData,
   ChatWithParticipants,
 } from '../domain/chat.repository.interface';
 
-@Injectable()
 export class PrismaChatRepository implements IChatRepository {
   private readonly logger = new Logger(PrismaChatRepository.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaClient) {}
 
   async findById(id: string): Promise<Chat | null> {
     const record = await this.prisma.chat.findUnique({
@@ -54,8 +52,6 @@ export class PrismaChatRepository implements IChatRepository {
   async createWithParticipants(
     data: CreateChatWithParticipantsData,
   ): Promise<ChatWithParticipants> {
-    const visibility = data.visibility ?? ChatVisibility.HIDDEN;
-
     try {
       return await this.prisma.$transaction(async (tx) => {
         // If matchId is specified, check if already exists inside transaction
@@ -75,8 +71,6 @@ export class PrismaChatRepository implements IChatRepository {
         const chatRecord = await tx.chat.create({
           data: {
             matchId: data.matchId ?? null,
-            visibility,
-            title: data.title ?? null,
           },
         });
 
@@ -89,7 +83,6 @@ export class PrismaChatRepository implements IChatRepository {
             data: {
               chatId: chatRecord.id,
               userId,
-              role: ChatParticipantRole.MEMBER,
             },
           });
           participants.push(this.toDomainParticipant(pRecord));
@@ -125,75 +118,30 @@ export class PrismaChatRepository implements IChatRepository {
     return !!participant;
   }
 
-  async findUserChats(userId: string, includeHidden: boolean): Promise<Chat[]> {
-    const whereClause: any = {
-      participants: {
-        some: {
-          userId,
+  async findUserChats(userId: string, _includeHidden: boolean = true): Promise<Chat[]> {
+    const records = await this.prisma.chat.findMany({
+      where: {
+        participants: {
+          some: {
+            userId,
+          },
         },
       },
-    };
-
-    if (!includeHidden) {
-      // Strictly exclude HIDDEN chats at database level
-      whereClause.visibility = {
-        not: ChatVisibility.HIDDEN,
-      };
-    }
-
-    const records = await this.prisma.chat.findMany({
-      where: whereClause,
       orderBy: { updatedAt: 'desc' },
     });
 
     return records.map((r) => this.toDomainChat(r));
   }
 
-  async findAllHiddenChats(
-    limit: number,
-    offset: number,
-  ): Promise<{ chats: ChatWithParticipants[]; total: number }> {
-    const [records, total] = await Promise.all([
-      this.prisma.chat.findMany({
-        where: {
-          visibility: ChatVisibility.HIDDEN,
-        },
-        include: {
-          participants: true,
-        },
-        take: limit,
-        skip: offset,
-        orderBy: { createdAt: 'desc' },
-      }),
-      this.prisma.chat.count({
-        where: {
-          visibility: ChatVisibility.HIDDEN,
-        },
-      }),
-    ]);
-
-    return {
-      chats: records.map((r) => ({
-        chat: this.toDomainChat(r),
-        participants: r.participants.map((p) => this.toDomainParticipant(p)),
-      })),
-      total,
-    };
-  }
-
   private toDomainChat(record: {
     id: string;
     matchId: string | null;
-    visibility: string;
-    title: string | null;
     createdAt: Date;
     updatedAt: Date;
   }): Chat {
     return Chat.create({
       id: record.id,
       matchId: record.matchId,
-      visibility: record.visibility as ChatVisibility,
-      title: record.title,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
     });
@@ -203,14 +151,12 @@ export class PrismaChatRepository implements IChatRepository {
     id: string;
     chatId: string;
     userId: string;
-    role: string;
     joinedAt: Date;
   }): ChatParticipant {
     return ChatParticipant.create({
       id: record.id,
       chatId: record.chatId,
       userId: record.userId,
-      role: record.role as ChatParticipantRole,
       joinedAt: record.joinedAt,
     });
   }

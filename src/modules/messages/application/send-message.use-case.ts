@@ -1,6 +1,6 @@
-import { Injectable, Inject, Logger } from '@nestjs/common';
-import { IMessageRepository, MESSAGE_REPOSITORY } from '../domain/message.repository.interface';
-import { IChatRepository, CHAT_REPOSITORY } from '../../chats/domain/chat.repository.interface';
+import { Logger } from '../../../shared/infrastructure/logger';
+import { IMessageRepository } from '../domain/message.repository.interface';
+import { IChatRepository } from '../../chats/domain/chat.repository.interface';
 import { Message } from '../domain/message.entity';
 import {
   UserNotChatParticipantError,
@@ -14,14 +14,11 @@ export interface SendMessageInput {
   content: string;
 }
 
-@Injectable()
 export class SendMessageUseCase {
   private readonly logger = new Logger(SendMessageUseCase.name);
 
   constructor(
-    @Inject(MESSAGE_REPOSITORY)
     private readonly messageRepository: IMessageRepository,
-    @Inject(CHAT_REPOSITORY)
     private readonly chatRepository: IChatRepository,
   ) {}
 

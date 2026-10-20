@@ -1,5 +1,5 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy, Inject, Optional } from '@nestjs/common';
 import { Bot, Context, Keyboard, InlineKeyboard } from 'grammy';
+import { Logger } from '../../../shared/infrastructure/logger';
 import { HandleTelegramStartUseCase } from '../application/handle-telegram-start.use-case';
 import { HandleTelegramMessageUseCase } from '../application/handle-telegram-message.use-case';
 import { GetUserActiveChatPartnerUseCase } from '../../chats/application/get-user-active-chat-partner.use-case';
@@ -7,8 +7,8 @@ import { GetUserChatListUseCase } from '../../chats/application/get-user-chat-li
 import { SwitchUserActiveChatUseCase } from '../../chats/application/switch-user-active-chat.use-case';
 import { TerminateChatUseCase } from '../../chats/application/terminate-chat.use-case';
 import { UserActiveChatService } from '../../chats/application/user-active-chat.service';
-import { IMessageRepository, MESSAGE_REPOSITORY } from '../../messages/domain/message.repository.interface';
-import { IUserRepository, USER_REPOSITORY } from '../../users/domain/user.repository.interface';
+import { IMessageRepository } from '../../messages/domain/message.repository.interface';
+import { IUserRepository } from '../../users/domain/user.repository.interface';
 import { getEnvConfig, setBotUsername } from '../../../shared/infrastructure/config/env.config';
 
 export const ACTIVE_CHAT_KEYBOARD = new Keyboard()
@@ -28,35 +28,78 @@ export function getMenuKeyboard(hasActiveChat: boolean): Keyboard {
   return hasActiveChat ? ACTIVE_CHAT_KEYBOARD : NO_ACTIVE_CHAT_KEYBOARD;
 }
 
-@Injectable()
-export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
+export interface TelegramBotServiceDeps {
+  handleStartUseCase: HandleTelegramStartUseCase;
+  handleMessageUseCase: HandleTelegramMessageUseCase;
+  getUserActiveChatPartnerUseCase: GetUserActiveChatPartnerUseCase;
+  getUserChatListUseCase: GetUserChatListUseCase;
+  switchUserActiveChatUseCase: SwitchUserActiveChatUseCase;
+  terminateChatUseCase?: TerminateChatUseCase;
+  userRepository?: IUserRepository;
+  messageRepository?: IMessageRepository;
+  userActiveChatService?: UserActiveChatService;
+  botToken?: string;
+}
+
+export class TelegramBotService {
   private readonly logger = new Logger(TelegramBotService.name);
   private bot: Bot<Context>;
 
+  private readonly handleStartUseCase: HandleTelegramStartUseCase;
+  private readonly handleMessageUseCase: HandleTelegramMessageUseCase;
+  private readonly getUserActiveChatPartnerUseCase: GetUserActiveChatPartnerUseCase;
+  private readonly getUserChatListUseCase: GetUserChatListUseCase;
+  private readonly switchUserActiveChatUseCase: SwitchUserActiveChatUseCase;
+  private readonly terminateChatUseCase?: TerminateChatUseCase;
+  private readonly userRepository?: IUserRepository;
+  private readonly messageRepository?: IMessageRepository;
+  private readonly userActiveChatService?: UserActiveChatService;
+
   constructor(
-    private readonly handleStartUseCase: HandleTelegramStartUseCase,
-    private readonly handleMessageUseCase: HandleTelegramMessageUseCase,
-    private readonly getUserActiveChatPartnerUseCase: GetUserActiveChatPartnerUseCase,
-    private readonly getUserChatListUseCase: GetUserChatListUseCase,
-    private readonly switchUserActiveChatUseCase: SwitchUserActiveChatUseCase,
-    @Optional()
-    @Inject(MESSAGE_REPOSITORY)
-    private readonly messageRepository?: IMessageRepository,
-    @Optional()
-    @Inject(USER_REPOSITORY)
-    private readonly userRepository?: IUserRepository,
-    @Optional()
-    private readonly terminateChatUseCase?: TerminateChatUseCase,
-    @Optional()
-    private readonly userActiveChatService?: UserActiveChatService,
+    depsOrHandleStart: TelegramBotServiceDeps | HandleTelegramStartUseCase,
+    handleMessageUseCase?: HandleTelegramMessageUseCase,
+    getUserActiveChatPartnerUseCase?: GetUserActiveChatPartnerUseCase,
+    getUserChatListUseCase?: GetUserChatListUseCase,
+    switchUserActiveChatUseCase?: SwitchUserActiveChatUseCase,
+    messageRepository?: IMessageRepository,
+    userRepository?: IUserRepository,
+    terminateChatUseCase?: TerminateChatUseCase,
+    userActiveChatService?: UserActiveChatService,
+    botToken?: string,
   ) {
-    const token = getEnvConfig().TELEGRAM_BOT_TOKEN;
+    let token: string;
+
+    if ('handleStartUseCase' in depsOrHandleStart) {
+      const deps = depsOrHandleStart as TelegramBotServiceDeps;
+      this.handleStartUseCase = deps.handleStartUseCase;
+      this.handleMessageUseCase = deps.handleMessageUseCase;
+      this.getUserActiveChatPartnerUseCase = deps.getUserActiveChatPartnerUseCase;
+      this.getUserChatListUseCase = deps.getUserChatListUseCase;
+      this.switchUserActiveChatUseCase = deps.switchUserActiveChatUseCase;
+      this.terminateChatUseCase = deps.terminateChatUseCase;
+      this.userRepository = deps.userRepository;
+      this.messageRepository = deps.messageRepository;
+      this.userActiveChatService = deps.userActiveChatService;
+      token = deps.botToken ?? getEnvConfig().TELEGRAM_BOT_TOKEN;
+    } else {
+      this.handleStartUseCase = depsOrHandleStart;
+      this.handleMessageUseCase = handleMessageUseCase!;
+      this.getUserActiveChatPartnerUseCase = getUserActiveChatPartnerUseCase!;
+      this.getUserChatListUseCase = getUserChatListUseCase!;
+      this.switchUserActiveChatUseCase = switchUserActiveChatUseCase!;
+      this.messageRepository = messageRepository;
+      this.userRepository = userRepository;
+      this.terminateChatUseCase = terminateChatUseCase;
+      this.userActiveChatService = userActiveChatService;
+      token = botToken ?? getEnvConfig().TELEGRAM_BOT_TOKEN;
+    }
+
     this.bot = new Bot<Context>(token, {
       botInfo: {
         id: 100000000,
         is_bot: true,
-        first_name: 'HiddenChatBot',
-        username: 'hidden_chat_bot',
+        first_name: 'ChatBot',
+        username: 'chat_bot',
         can_join_groups: false,
         can_read_all_group_messages: false,
         supports_inline_queries: false,
@@ -163,19 +206,16 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
 
       const text = ctx.message.text.trim();
 
-      // TASK 1 Button: نمایش پروفایل کاربر
       if (text === 'نمایش پروفایل کاربر') {
         await this.handleShowProfile(ctx);
         return;
       }
 
-      // TASK 2 Button: چت ها
       if (text === 'چت ها') {
         await this.handleListChats(ctx);
         return;
       }
 
-      // TASK 1 Button: پایان چت
       if (text === 'پایان چت') {
         await this.handleTerminateChatPrompt(ctx);
         return;
@@ -194,14 +234,11 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
         if (result.success && result.recipientTelegramUserId) {
           try {
             if (result.isRecipientActiveInSameChat) {
-              // Recipient is active in the same chat -> direct message relay
               await this.bot.api.sendMessage(
                 result.recipientTelegramUserId,
                 `💬 ${ctx.message.text}`,
               );
             } else {
-              // TASK 2: If recipient was chatting with another user, send notification with switch button
-              // Message format: یک پیام از کاربر [name] دارید
               const switchKeyboard = new InlineKeyboard().text(
                 `💬 رفتن به چت با ${result.senderName}`,
                 `switch_chat:${result.chatId}`,
@@ -259,37 +296,29 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
         startPayload,
       });
 
-      const hasActiveChat =
-        (result.status === 'CONNECTED' && !!result.chatId) ||
-        result.status === 'ALREADY_CONNECTED';
+      const hasActiveChat = result.status === 'CONNECTED' && !!result.chatId;
 
       await ctx.reply(result.message, { reply_markup: getMenuKeyboard(hasActiveChat) });
 
-      if (result.notifyPartnerUserId && this.userRepository) {
+      if (result.notifyPartnerTelegramUserId) {
         try {
-          const partner = await this.userRepository.findById(result.notifyPartnerUserId);
-          if (partner?.telegramUserId) {
-            await this.bot.api.sendMessage(
-              partner.telegramUserId,
-              '🎉 هم‌صحبت شما به چت پیوست! اکنون می‌توانید با ارسال پیام، گفتگو را آغاز کنید.',
-              { reply_markup: ACTIVE_CHAT_KEYBOARD },
-            );
-          }
+          await this.bot.api.sendMessage(
+            result.notifyPartnerTelegramUserId,
+            '🎉 هم‌صحبت شما با کلید مشترک به چت پیوست! گفتگو آغاز شد.',
+            { reply_markup: ACTIVE_CHAT_KEYBOARD },
+          );
         } catch (notifyErr: any) {
-          this.logger.warn(`Could not notify partner ${result.notifyPartnerUserId}: ${notifyErr.message}`);
+          this.logger.warn(`Could not notify partner ${result.notifyPartnerTelegramUserId}: ${notifyErr.message}`);
         }
       }
     } catch (err: any) {
       this.logger.error(`Error in /start command: ${err.message}`, err.stack);
-      await ctx.reply('An unexpected error occurred. Please try again later.', {
+      await ctx.reply('خطایی رخ داد. لطفاً دوباره تلاش کنید.', {
         reply_markup: NO_ACTIVE_CHAT_KEYBOARD,
       });
     }
   }
 
-  /**
-   * TASK 1: Display real profile picture and name of the active chat partner
-   */
   private async handleShowProfile(ctx: Context) {
     const from = ctx.from;
     if (!from) return;
@@ -309,7 +338,6 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       const partnerName = result.partnerName!;
       const partnerTgId = Number(result.partnerUser.telegramUserId);
 
-      // Attempt to retrieve user's real profile photo from Telegram
       try {
         const photos = await this.bot.api.getUserProfilePhotos(partnerTgId, { limit: 1 });
         if (photos && photos.total_count > 0 && photos.photos.length > 0 && photos.photos[0].length > 0) {
@@ -324,7 +352,6 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
         this.logger.warn(`Could not get profile photo for ${partnerTgId}: ${photoErr.message}`);
       }
 
-      // Fallback when photo is missing or privacy restricted
       await ctx.reply(
         `👤 نام کاربر: ${partnerName}\n(این کاربر تصویر پروفایل ندارد یا نمایش آن را در تنظیمات تلگرام محدود کرده است)`,
         { reply_markup: ACTIVE_CHAT_KEYBOARD },
@@ -335,9 +362,6 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /**
-   * TASK 2: Display list of chats with users names on buttons
-   */
   private async handleListChats(ctx: Context) {
     const from = ctx.from;
     if (!from) return;
@@ -348,7 +372,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
 
       if (!result.success || result.chats.length === 0) {
         await ctx.reply(
-          'شما در حال حاضر هیچ چت فعالی ندارید. برای شروع گفتگو باید از طریق لینک همسان‌سازی وارد شوید.',
+          'شما در حال حاضر هیچ چت فعالی ندارید. برای شروع گفتگو باید از طریق کلید همسان‌سازی وارد شوید.',
           { reply_markup: NO_ACTIVE_CHAT_KEYBOARD },
         );
         return;
@@ -370,9 +394,6 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /**
-   * TASK 2: Switch active chat when a user clicks on a chat button
-   */
   private async handleSwitchChatCallback(ctx: Context) {
     const from = ctx.from;
     if (!from) return;
@@ -409,7 +430,6 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
         },
       );
 
-      // Optionally show the latest received message from this partner so the user has context
       if (this.messageRepository) {
         try {
           const history = await this.messageRepository.findByChatId(targetChatId, 1, 0);
@@ -421,7 +441,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
             }
           }
         } catch {
-          // Non-critical, ignore
+          // Non-critical
         }
       }
     } catch (err: any) {
@@ -430,9 +450,6 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /**
-   * Prompts user with confirmation before terminating active chat
-   */
   private async handleTerminateChatPrompt(ctx: Context) {
     const from = ctx.from;
     if (!from) return;
@@ -466,9 +483,6 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /**
-   * Handles user confirming chat termination via inline button
-   */
   private async handleConfirmTerminateCallback(ctx: Context) {
     const from = ctx.from;
     if (!from) return;
@@ -508,14 +522,12 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       const terminatorName = termResult.terminatorName ?? 'کاربر';
       const partnerTgId = termResult.partnerTelegramUserId;
 
-      // 1. Process post-termination for initiator (User A)
       await this.processUserPostTermination({
         telegramUserId,
         notificationMessage: `کاربر ${partnerName} چت را بست`,
         ctx,
       });
 
-      // 2. Process post-termination for partner (User B)
       if (partnerTgId) {
         await this.processUserPostTermination({
           telegramUserId: partnerTgId,
@@ -528,13 +540,6 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /**
-   * Post-termination flow for a user:
-   * 1. Displays notification: کاربر [name] چت را بست
-   * 2. If available chats === 1: switches automatically to that next chat
-   * 3. If available chats > 1: displays list of chats to choose another chat
-   * 4. If available chats === 0: sets no-active-chat keyboard
-   */
   private async processUserPostTermination(params: {
     telegramUserId: string;
     notificationMessage: string;
@@ -558,7 +563,6 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       }
     };
 
-    // Check available chats remaining for user (excluding the terminated chat)
     const listResult = await this.getUserChatListUseCase.execute({
       telegramUserId,
       autoSelectIfNone: false,
@@ -567,7 +571,6 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     const availableChats = listResult.success ? listResult.chats : [];
 
     if (availableChats.length === 1) {
-      // Exactly 1 other chat -> switch to next chat
       const nextChat = availableChats[0];
       await this.switchUserActiveChatUseCase.execute({
         telegramUserId,
@@ -580,7 +583,6 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
         ACTIVE_CHAT_KEYBOARD,
       );
     } else if (availableChats.length > 1) {
-      // More than 1 chat -> display list to choose
       await sendMessage(notificationMessage, NO_ACTIVE_CHAT_KEYBOARD);
 
       const keyboard = new InlineKeyboard();
@@ -591,14 +593,10 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
 
       await sendMessage('📋 چت‌های شما:\nبرای گفتگو، کاربر مورد نظر را انتخاب کنید:', keyboard);
     } else {
-      // 0 available chats
       await sendMessage(notificationMessage, NO_ACTIVE_CHAT_KEYBOARD);
     }
   }
 
-  /**
-   * Process a Telegram update object (used for Webhooks and Integration Tests)
-   */
   async handleUpdate(update: any): Promise<void> {
     await this.bot.handleUpdate(update);
   }
@@ -607,19 +605,19 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     return this.bot;
   }
 
-  async onModuleInit() {
-    // Only run polling if explicitly configured and not running in test mode
-    if (process.env.NODE_ENV !== 'test' && process.env.TELEGRAM_POLLING === 'true') {
+  async start(): Promise<void> {
+    const isPolling = process.env.NODE_ENV !== 'test' && getEnvConfig().TELEGRAM_POLLING === 'true';
+    if (isPolling) {
       this.logger.log('Starting Telegram bot polling...');
       try {
         await this.bot.api.deleteWebhook({ drop_pending_updates: false });
       } catch {
-        // Webhook might not exist, proceed
+        // Webhook might not exist
       }
 
       this.bot.start({
         onStart: (botInfo) => {
-          this.logger.log(`Telegram Bot @${botInfo.username} started`);
+          this.logger.log(`Telegram Bot @${botInfo.username} started successfully`);
           if (botInfo.username) {
             setBotUsername(botInfo.username);
           }
@@ -630,7 +628,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async onModuleDestroy() {
+  async stop(): Promise<void> {
     if (this.bot.isInited()) {
       await this.bot.stop();
       this.logger.log('Telegram bot stopped');

@@ -1,7 +1,7 @@
-import { Injectable, Inject, Logger, Optional } from '@nestjs/common';
-import { IUserRepository, USER_REPOSITORY } from '../../users/domain/user.repository.interface';
-import { IChatRepository, CHAT_REPOSITORY } from '../domain/chat.repository.interface';
-import { IMatchRepository, MATCH_REPOSITORY } from '../../matches/domain/match.repository.interface';
+import { Logger } from '../../../shared/infrastructure/logger';
+import { IUserRepository } from '../../users/domain/user.repository.interface';
+import { IChatRepository } from '../domain/chat.repository.interface';
+import { IMatchRepository } from '../../matches/domain/match.repository.interface';
 import { MatchStatus } from '../../matches/domain/match-status.enum';
 import { UserActiveChatService } from './user-active-chat.service';
 import { User } from '../../users/domain/user.entity';
@@ -25,18 +25,13 @@ export interface GetUserChatListOutput {
   chats: ChatListItem[];
 }
 
-@Injectable()
 export class GetUserChatListUseCase {
   private readonly logger = new Logger(GetUserChatListUseCase.name);
 
   constructor(
-    @Inject(USER_REPOSITORY)
     private readonly userRepository: IUserRepository,
-    @Inject(CHAT_REPOSITORY)
     private readonly chatRepository: IChatRepository,
     private readonly userActiveChatService: UserActiveChatService,
-    @Optional()
-    @Inject(MATCH_REPOSITORY)
     private readonly matchRepository?: IMatchRepository,
   ) {}
 
@@ -50,8 +45,7 @@ export class GetUserChatListUseCase {
       };
     }
 
-    // Include hidden chats so user can see all their match chats
-    const userChats = await this.chatRepository.findUserChats(user.id, true);
+    const userChats = await this.chatRepository.findUserChats(user.id);
     if (userChats.length === 0) {
       return {
         success: true,
