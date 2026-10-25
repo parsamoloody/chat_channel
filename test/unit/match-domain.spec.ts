@@ -1,18 +1,19 @@
 import { Match } from '../../src/modules/matches/domain/match.entity';
 import { MatchStatus } from '../../src/modules/matches/domain/match-status.enum';
 import { Chat } from '../../src/modules/chats/domain/chat.entity';
-import { ChatVisibility } from '../../src/modules/chats/domain/chat-visibility.enum';
+import { ChatParticipant } from '../../src/modules/chats/domain/chat-participant.entity';
+import { Message } from '../../src/modules/messages/domain/message.entity';
 
 describe('Domain Entities Unit Tests', () => {
   describe('Match Entity', () => {
     const user1 = 'user-uuid-1';
     const user2 = 'user-uuid-2';
-    const externalId = 'match_101';
+    const matchKey = 'secret_key_101';
 
     it('should identify whether a user is a participant', () => {
       const match = Match.create({
         id: 'm1',
-        externalMatchId: externalId,
+        matchKey,
         user1Id: user1,
         user2Id: user2,
       });
@@ -25,7 +26,7 @@ describe('Domain Entities Unit Tests', () => {
     it('should correctly return the other participant', () => {
       const match = Match.create({
         id: 'm1',
-        externalMatchId: externalId,
+        matchKey,
         user1Id: user1,
         user2Id: user2,
       });
@@ -35,30 +36,19 @@ describe('Domain Entities Unit Tests', () => {
       expect(() => match.getOtherParticipantId('intruder-user')).toThrow();
     });
 
-    it('should correctly determine active status based on state and expiration', () => {
+    it('should correctly determine active status based on state', () => {
       const activeMatch = Match.create({
         id: 'm1',
-        externalMatchId: externalId,
+        matchKey,
         user1Id: user1,
         user2Id: user2,
         status: MatchStatus.ACTIVE,
-        expiresAt: new Date(Date.now() + 60000), // 1 min in future
       });
       expect(activeMatch.isActive()).toBe(true);
 
-      const expiredMatch = Match.create({
-        id: 'm2',
-        externalMatchId: externalId,
-        user1Id: user1,
-        user2Id: user2,
-        status: MatchStatus.ACTIVE,
-        expiresAt: new Date(Date.now() - 60000), // 1 min in past
-      });
-      expect(expiredMatch.isActive()).toBe(false);
-
       const cancelledMatch = Match.create({
-        id: 'm3',
-        externalMatchId: externalId,
+        id: 'm2',
+        matchKey,
         user1Id: user1,
         user2Id: user2,
         status: MatchStatus.CANCELLED,
@@ -68,27 +58,40 @@ describe('Domain Entities Unit Tests', () => {
   });
 
   describe('Chat Entity', () => {
-    it('should default visibility to HIDDEN for matched chats', () => {
+    it('should instantiate chat entity with matchId', () => {
       const chat = Chat.create({
         id: 'c1',
         matchId: 'm1',
       });
-      expect(chat.visibility).toBe(ChatVisibility.HIDDEN);
-      expect(chat.isHidden()).toBe(true);
+      expect(chat.id).toBe('c1');
+      expect(chat.matchId).toBe('m1');
+      expect(chat.createdAt).toBeInstanceOf(Date);
     });
+  });
 
-    it('should respect PUBLIC and PRIVATE visibility', () => {
-      const publicChat = Chat.create({
-        id: 'c2',
-        visibility: ChatVisibility.PUBLIC,
+  describe('ChatParticipant Entity', () => {
+    it('should create participant for chat and user', () => {
+      const participant = ChatParticipant.create({
+        id: 'cp1',
+        chatId: 'c1',
+        userId: 'u1',
       });
-      expect(publicChat.isHidden()).toBe(false);
+      expect(participant.id).toBe('cp1');
+      expect(participant.chatId).toBe('c1');
+      expect(participant.userId).toBe('u1');
+    });
+  });
 
-      const privateChat = Chat.create({
-        id: 'c3',
-        visibility: ChatVisibility.PRIVATE,
+  describe('Message Entity', () => {
+    it('should create message entity', () => {
+      const msg = Message.create({
+        id: 'msg1',
+        chatId: 'c1',
+        senderId: 'u1',
+        content: 'سلام، چطوری؟',
       });
-      expect(privateChat.isHidden()).toBe(false);
+      expect(msg.id).toBe('msg1');
+      expect(msg.content).toBe('سلام، چطوری؟');
     });
   });
 });

@@ -6,10 +6,8 @@ dotenv.config();
 const envSchema = z.object({
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
   TELEGRAM_BOT_TOKEN: z.string().min(1, 'TELEGRAM_BOT_TOKEN is required'),
-  ADMIN_API_KEY: z.string().min(8, 'ADMIN_API_KEY must be at least 8 characters long'),
-  PORT: z.coerce.number().default(3000),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  TELEGRAM_POLLING: z.string().optional().default('false'),
+  TELEGRAM_POLLING: z.string().optional().default('true'),
   TELEGRAM_BOT_USERNAME: z
     .string()
     .optional()
@@ -91,4 +89,3 @@ export function setBotUsername(username: string): void {
     config.TELEGRAM_BOT_USERNAME = clean;
   }
 }
-

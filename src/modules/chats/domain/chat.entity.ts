@@ -1,14 +1,23 @@
 import { ChatVisibility } from './chat-visibility.enum';
 
 export class Chat {
+  public readonly visibility: ChatVisibility = ChatVisibility.HIDDEN;
+
   constructor(
     public readonly id: string,
     public readonly matchId: string | null,
-    public readonly visibility: ChatVisibility,
-    public readonly title: string | null,
     public readonly createdAt: Date,
     public readonly updatedAt: Date,
-  ) {}
+    visibility?: ChatVisibility,
+  ) {
+    if (visibility) {
+      this.visibility = visibility;
+    }
+  }
+
+  public isHidden(): boolean {
+    return this.visibility === ChatVisibility.HIDDEN;
+  }
 
   public static create(props: {
     id: string;
@@ -21,14 +30,9 @@ export class Chat {
     return new Chat(
       props.id,
       props.matchId ?? null,
-      props.visibility ?? ChatVisibility.HIDDEN,
-      props.title ?? null,
       props.createdAt ?? new Date(),
       props.updatedAt ?? new Date(),
+      props.visibility ?? ChatVisibility.HIDDEN,
     );
-  }
-
-  public isHidden(): boolean {
-    return this.visibility === ChatVisibility.HIDDEN;
   }
 }

@@ -1,7 +1,7 @@
-import { Injectable, Inject, Logger } from '@nestjs/common';
-import { IUserRepository, USER_REPOSITORY } from '../../users/domain/user.repository.interface';
-import { IChatRepository, CHAT_REPOSITORY } from '../domain/chat.repository.interface';
-import { IMatchRepository, MATCH_REPOSITORY } from '../../matches/domain/match.repository.interface';
+import { Logger } from '../../../shared/infrastructure/logger';
+import { IUserRepository } from '../../users/domain/user.repository.interface';
+import { IChatRepository } from '../domain/chat.repository.interface';
+import { IMatchRepository } from '../../matches/domain/match.repository.interface';
 import { MatchStatus } from '../../matches/domain/match-status.enum';
 import { UserActiveChatService } from './user-active-chat.service';
 
@@ -19,16 +19,12 @@ export interface TerminateChatOutput {
   terminatorTelegramUserId?: string;
 }
 
-@Injectable()
 export class TerminateChatUseCase {
   private readonly logger = new Logger(TerminateChatUseCase.name);
 
   constructor(
-    @Inject(USER_REPOSITORY)
     private readonly userRepository: IUserRepository,
-    @Inject(CHAT_REPOSITORY)
     private readonly chatRepository: IChatRepository,
-    @Inject(MATCH_REPOSITORY)
     private readonly matchRepository: IMatchRepository,
     private readonly userActiveChatService: UserActiveChatService,
   ) {}

@@ -1,6 +1,6 @@
-import { Injectable, Inject, Logger } from '@nestjs/common';
-import { IMessageRepository, MESSAGE_REPOSITORY } from '../domain/message.repository.interface';
-import { IChatRepository, CHAT_REPOSITORY } from '../../chats/domain/chat.repository.interface';
+import { Logger } from '../../../shared/infrastructure/logger';
+import { IMessageRepository } from '../domain/message.repository.interface';
+import { IChatRepository } from '../../chats/domain/chat.repository.interface';
 import { Message } from '../domain/message.entity';
 import { UserNotChatParticipantError, ChatNotFoundError } from '../../../shared/domain/domain.error';
 
@@ -16,14 +16,11 @@ export interface GetChatMessagesOutput {
   total: number;
 }
 
-@Injectable()
 export class GetChatMessagesUseCase {
   private readonly logger = new Logger(GetChatMessagesUseCase.name);
 
   constructor(
-    @Inject(MESSAGE_REPOSITORY)
     private readonly messageRepository: IMessageRepository,
-    @Inject(CHAT_REPOSITORY)
     private readonly chatRepository: IChatRepository,
   ) {}
 

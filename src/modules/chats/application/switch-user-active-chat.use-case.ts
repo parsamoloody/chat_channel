@@ -1,6 +1,6 @@
-import { Injectable, Inject, Logger } from '@nestjs/common';
-import { IUserRepository, USER_REPOSITORY } from '../../users/domain/user.repository.interface';
-import { IChatRepository, CHAT_REPOSITORY } from '../domain/chat.repository.interface';
+import { Logger } from '../../../shared/infrastructure/logger';
+import { IUserRepository } from '../../users/domain/user.repository.interface';
+import { IChatRepository } from '../domain/chat.repository.interface';
 import { UserActiveChatService } from './user-active-chat.service';
 import { User } from '../../users/domain/user.entity';
 
@@ -17,14 +17,11 @@ export interface SwitchUserActiveChatOutput {
   partnerName?: string;
 }
 
-@Injectable()
 export class SwitchUserActiveChatUseCase {
   private readonly logger = new Logger(SwitchUserActiveChatUseCase.name);
 
   constructor(
-    @Inject(USER_REPOSITORY)
     private readonly userRepository: IUserRepository,
-    @Inject(CHAT_REPOSITORY)
     private readonly chatRepository: IChatRepository,
     private readonly userActiveChatService: UserActiveChatService,
   ) {}

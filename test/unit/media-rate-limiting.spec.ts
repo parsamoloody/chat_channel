@@ -481,18 +481,18 @@ describe('Media Support & Rate Limiting (Stickers, GIFs, Emojis)', () => {
 
       const mockHandleStart = { execute: jest.fn() };
 
-      botService = new TelegramBotService(
-        mockHandleStart as any,
-        handleTelegramMessageUseCase,
+      botService = new TelegramBotService({
+        handleStartUseCase: mockHandleStart as any,
+        handleMessageUseCase: handleTelegramMessageUseCase,
         getUserActiveChatPartnerUseCase,
         getUserChatListUseCase,
         switchUserActiveChatUseCase,
-        mockMessageRepo as any,
-        mockUserRepo as any,
-        undefined,
+        messageRepository: mockMessageRepo as any,
+        userRepository: mockUserRepo as any,
         userActiveChatService,
-        rateLimiterService,
-      );
+        mediaRateLimiterService: rateLimiterService,
+        botToken: 'mock_test_token_media',
+      });
     });
 
     it('should handle sticker update from user in active chat', async () => {

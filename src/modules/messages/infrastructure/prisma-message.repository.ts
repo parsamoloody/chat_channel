@@ -1,11 +1,9 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../../shared/infrastructure/database/prisma.service';
+import { PrismaClient } from '@prisma/client';
 import { Message } from '../domain/message.entity';
 import { IMessageRepository, CreateMessageData } from '../domain/message.repository.interface';
 
-@Injectable()
 export class PrismaMessageRepository implements IMessageRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaClient) {}
 
   async create(data: CreateMessageData): Promise<Message> {
     const record = await this.prisma.message.create({
@@ -55,7 +53,6 @@ export class PrismaMessageRepository implements IMessageRepository {
     senderId: string;
     content: string;
     createdAt: Date;
-    updatedAt: Date;
   }): Message {
     return Message.create({
       id: record.id,
@@ -63,7 +60,6 @@ export class PrismaMessageRepository implements IMessageRepository {
       senderId: record.senderId,
       content: record.content,
       createdAt: record.createdAt,
-      updatedAt: record.updatedAt,
     });
   }
 }

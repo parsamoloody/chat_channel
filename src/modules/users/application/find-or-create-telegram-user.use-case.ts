@@ -1,6 +1,6 @@
-import { Injectable, Inject, Logger } from '@nestjs/common';
+import { Logger } from '../../../shared/infrastructure/logger';
 import { User } from '../domain/user.entity';
-import { IUserRepository, USER_REPOSITORY } from '../domain/user.repository.interface';
+import { IUserRepository } from '../domain/user.repository.interface';
 
 export interface TelegramUserProfileInput {
   telegramUserId: string;
@@ -9,14 +9,10 @@ export interface TelegramUserProfileInput {
   lastName?: string | null;
 }
 
-@Injectable()
 export class FindOrCreateTelegramUserUseCase {
   private readonly logger = new Logger(FindOrCreateTelegramUserUseCase.name);
 
-  constructor(
-    @Inject(USER_REPOSITORY)
-    private readonly userRepository: IUserRepository,
-  ) {}
+  constructor(private readonly userRepository: IUserRepository) {}
 
   async execute(input: TelegramUserProfileInput): Promise<User> {
     const existing = await this.userRepository.findByTelegramUserId(input.telegramUserId);

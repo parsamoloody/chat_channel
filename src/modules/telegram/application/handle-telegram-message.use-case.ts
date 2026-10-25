@@ -1,6 +1,6 @@
-import { Injectable, Logger, Inject, Optional } from '@nestjs/common';
-import { IUserRepository, USER_REPOSITORY } from '../../users/domain/user.repository.interface';
-import { IChatRepository, CHAT_REPOSITORY } from '../../chats/domain/chat.repository.interface';
+import { Logger } from '../../../shared/infrastructure/logger';
+import { IUserRepository } from '../../users/domain/user.repository.interface';
+import { IChatRepository } from '../../chats/domain/chat.repository.interface';
 import { UserActiveChatService } from '../../chats/application/user-active-chat.service';
 import { REPLY_TEXTS } from '../constants/reply-texts';
 import { SendMessageUseCase } from '../../messages/application/send-message.use-case';
@@ -42,19 +42,14 @@ export interface HandleTelegramMessageOutput {
   emoji?: string;
 }
 
-@Injectable()
 export class HandleTelegramMessageUseCase {
   private readonly logger = new Logger(HandleTelegramMessageUseCase.name);
 
   constructor(
-    @Inject(USER_REPOSITORY)
     private readonly userRepository: IUserRepository,
-    @Inject(CHAT_REPOSITORY)
     private readonly chatRepository: IChatRepository,
     private readonly sendMessageUseCase: SendMessageUseCase,
-    @Optional()
     private readonly userActiveChatService?: UserActiveChatService,
-    @Optional()
     private readonly mediaRateLimiterService?: MediaRateLimiterService,
   ) {}
 
@@ -63,12 +58,12 @@ export class HandleTelegramMessageUseCase {
     if (!user) {
       return {
         success: false,
-        responseToSender: 'Please click the link from your Dating Bot first to start your chat.',
+        responseToSender: 'لطفاً ابتدا از طریق لینک همسان‌سازی وارد شوید.',
       };
     }
 
     // Find all chats for this user and filter for valid chats with a partner
-    const allUserChats = await this.chatRepository.findUserChats(user.id, true);
+    const allUserChats = await this.chatRepository.findUserChats(user.id);
     const validChats: { chat: Chat; partnerId: string }[] = [];
 
     for (const c of allUserChats) {
@@ -156,7 +151,7 @@ export class HandleTelegramMessageUseCase {
           REPLY_TEXTS.DEFAULT_USER_NAME;
 
         // Count valid chats for recipient
-        const recipientAllChats = await this.chatRepository.findUserChats(recipientUser.id, true);
+        const recipientAllChats = await this.chatRepository.findUserChats(recipientUser.id);
         let recipientValidChatCount = 0;
         for (const rc of recipientAllChats) {
           if (this.userActiveChatService?.isChatTerminated(rc.id)) {

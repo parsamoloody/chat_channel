@@ -1,5 +1,5 @@
-import { Injectable, Inject, Logger } from '@nestjs/common';
-import { IChatRepository, CHAT_REPOSITORY, ChatWithParticipants } from '../domain/chat.repository.interface';
+import { Logger } from '../../../shared/infrastructure/logger';
+import { IChatRepository, ChatWithParticipants } from '../domain/chat.repository.interface';
 import {
   ChatNotFoundError,
   UserNotChatParticipantError,
@@ -10,14 +10,10 @@ export interface GetChatDetailsInput {
   requestingUserId: string;
 }
 
-@Injectable()
 export class GetChatDetailsUseCase {
   private readonly logger = new Logger(GetChatDetailsUseCase.name);
 
-  constructor(
-    @Inject(CHAT_REPOSITORY)
-    private readonly chatRepository: IChatRepository,
-  ) {}
+  constructor(private readonly chatRepository: IChatRepository) {}
 
   async execute(input: GetChatDetailsInput): Promise<ChatWithParticipants> {
     const isParticipant = await this.chatRepository.isParticipant(

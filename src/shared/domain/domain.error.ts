@@ -11,7 +11,7 @@ export class ForbiddenError extends DomainError {}
 export class UnauthorizedError extends DomainError {}
 export class ConflictError extends DomainError {}
 export class ValidationError extends DomainError {}
-export class InvalidReferralPayloadError extends ValidationError {}
+export class InvalidMatchKeyError extends ValidationError {}
 export class MatchNotFoundError extends NotFoundError {}
 export class MatchExpiredError extends ForbiddenError {}
 export class UserNotMatchParticipantError extends ForbiddenError {}

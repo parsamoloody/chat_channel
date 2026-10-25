@@ -1,18 +1,19 @@
-import { Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
-import { PrismaService } from '../../../shared/infrastructure/database/prisma.service';
+import { PrismaClient } from '@prisma/client';
+import { Logger } from '../../../shared/infrastructure/logger';
 import * as fs from 'fs';
 import * as path from 'path';
 
-@Injectable()
-export class UserActiveChatService implements OnModuleInit {
+export class UserActiveChatService {
   private readonly logger = new Logger(UserActiveChatService.name);
   private readonly activeChats = new Map<string, string>(); // userId -> chatId
   private readonly terminatedChats = new Set<string>(); // chatId
   private readonly storageFilePath = path.resolve(process.cwd(), '.active_chats.json');
 
-  constructor(@Optional() private readonly prisma?: PrismaService) {}
+  constructor(private readonly prisma?: PrismaClient) {
+    this.loadStateFromFile();
+  }
 
-  async onModuleInit() {
+  async init(): Promise<void> {
     this.loadStateFromFile();
     if (this.prisma) {
       await this.syncWithDatabase();
