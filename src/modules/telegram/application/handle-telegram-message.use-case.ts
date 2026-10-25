@@ -6,10 +6,25 @@ import { REPLY_TEXTS } from '../constants/reply-texts';
 import { SendMessageUseCase } from '../../messages/application/send-message.use-case';
 import { Message } from '../../messages/domain/message.entity';
 import { Chat } from '../../chats/domain/chat.entity';
+import { MediaRateLimiterService } from './media-rate-limiter.service';
+
+export type MessageMediaType =
+  | 'text'
+  | 'sticker'
+  | 'animation'
+  | 'dice'
+  | 'photo'
+  | 'video'
+  | 'document';
 
 export interface HandleTelegramMessageInput {
   telegramUserId: string;
   content: string;
+  mediaType?: MessageMediaType;
+  fileId?: string;
+  fileSize?: number;
+  caption?: string;
+  emoji?: string;
 }
 
 export interface HandleTelegramMessageOutput {
@@ -21,6 +36,10 @@ export interface HandleTelegramMessageOutput {
   recipientTelegramUserId?: string;
   isRecipientActiveInSameChat?: boolean;
   responseToSender: string;
+  mediaType?: MessageMediaType;
+  fileId?: string;
+  caption?: string;
+  emoji?: string;
 }
 
 @Injectable()
@@ -35,6 +54,8 @@ export class HandleTelegramMessageUseCase {
     private readonly sendMessageUseCase: SendMessageUseCase,
     @Optional()
     private readonly userActiveChatService?: UserActiveChatService,
+    @Optional()
+    private readonly mediaRateLimiterService?: MediaRateLimiterService,
   ) {}
 
   async execute(input: HandleTelegramMessageInput): Promise<HandleTelegramMessageOutput> {
@@ -76,11 +97,33 @@ export class HandleTelegramMessageUseCase {
       activeChatEntry = validChats[0];
       activeChatId = activeChatEntry.chat.id;
       if (this.userActiveChatService) {
-        this.userActiveChatService.setActiveChat(user.id, activeChatId);
+        this.userActiveChatService.setActiveChat(user.id, activeChatEntry.chat.id);
       }
     }
 
     const activeChat = activeChatEntry.chat;
+
+    // Check media file size & rate limit if media is sent
+    const isMedia = input.mediaType && input.mediaType !== 'text';
+    if (isMedia && this.mediaRateLimiterService) {
+      if (input.fileSize !== undefined) {
+        const sizeCheck = this.mediaRateLimiterService.checkFileSize(input.fileSize);
+        if (!sizeCheck.allowed) {
+          return {
+            success: false,
+            responseToSender: sizeCheck.message || 'File size exceeds limit.',
+          };
+        }
+      }
+
+      const rateCheck = this.mediaRateLimiterService.checkRateLimit(user.id);
+      if (!rateCheck.allowed) {
+        return {
+          success: false,
+          responseToSender: rateCheck.message || 'Media upload rate limit exceeded.',
+        };
+      }
+    }
 
     try {
       const savedMessage = await this.sendMessageUseCase.execute({
@@ -88,6 +131,11 @@ export class HandleTelegramMessageUseCase {
         senderId: user.id,
         content: input.content,
       });
+
+      // On successful media send, record upload in sliding window rate limiter
+      if (isMedia && this.mediaRateLimiterService) {
+        this.mediaRateLimiterService.recordUpload(user.id);
+      }
 
       // Find recipient user
       let recipientTelegramUserId: string | undefined;
@@ -145,6 +193,10 @@ export class HandleTelegramMessageUseCase {
         recipientTelegramUserId,
         isRecipientActiveInSameChat,
         responseToSender: 'Message delivered',
+        mediaType: input.mediaType,
+        fileId: input.fileId,
+        caption: input.caption,
+        emoji: input.emoji,
       };
     } catch (error: any) {
       this.logger.error(`Error sending message for telegram user ${input.telegramUserId}: ${error.message}`);

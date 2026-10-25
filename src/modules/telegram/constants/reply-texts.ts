@@ -39,8 +39,14 @@ export const REPLY_TEXTS = {
   RELAY_MESSAGE: (content: string): string => `💬 ${content}`,
   MESSAGE_NOTIFICATION: (senderName: string): string =>
     `یک پیام از کاربر ${senderName} دارید`,
+  MEDIA_NOTIFICATION: (senderName: string, mediaLabel?: string): string =>
+    `یک ${mediaLabel ?? 'پیام'} از کاربر ${senderName} دارید`,
   NO_ACTIVE_CHAT_RELAY_ERROR:
     'شما در حال حاضر هیچ چت فعالی ندارید. لطفاً ابتدا از طریق لینک مچ وارد شوید.',
+  MEDIA_FILE_TOO_LARGE: (maxSizeMB: number): string =>
+    `حجم فایل ارسالی بیشتر از حد مجاز (${maxSizeMB} مگابایت) است.`,
+  MEDIA_RATE_LIMIT_EXCEEDED: (count: number, unitText: string): string =>
+    `شما به سقف مجاز ارسال رسانه رسیده‌اید. حداکثر مجاز: ${count} رسانه در هر ${unitText}. لطفاً بعداً تلاش کنید.`,
 
   // Profile View
   PROFILE_NO_ACTIVE_CHAT:

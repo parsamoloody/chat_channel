@@ -1,7 +1,8 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy, Inject, Optional } from '@nestjs/common';
 import { Bot, Context, Keyboard, InlineKeyboard } from 'grammy';
 import { HandleTelegramStartUseCase } from '../application/handle-telegram-start.use-case';
-import { HandleTelegramMessageUseCase } from '../application/handle-telegram-message.use-case';
+import { HandleTelegramMessageUseCase, MessageMediaType } from '../application/handle-telegram-message.use-case';
+import { MediaRateLimiterService } from '../application/media-rate-limiter.service';
 import { GetUserActiveChatPartnerUseCase } from '../../chats/application/get-user-active-chat-partner.use-case';
 import { GetUserChatListUseCase } from '../../chats/application/get-user-chat-list.use-case';
 import { SwitchUserActiveChatUseCase } from '../../chats/application/switch-user-active-chat.use-case';
@@ -54,6 +55,8 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     private readonly terminateChatUseCase?: TerminateChatUseCase,
     @Optional()
     private readonly userActiveChatService?: UserActiveChatService,
+    @Optional()
+    private readonly mediaRateLimiterService?: MediaRateLimiterService,
   ) {
     const token = getEnvConfig().TELEGRAM_BOT_TOKEN;
     this.bot = new Bot<Context>(token, {
@@ -89,6 +92,39 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
               chat: { id: (payload as any)?.chat_id ?? 1, type: 'private' },
               photo: [{ file_id: (payload as any)?.photo ?? 'mock_photo', width: 320, height: 320 }],
               caption: (payload as any)?.caption ?? '',
+            } as any,
+          } as any;
+        }
+        if (method === 'sendSticker') {
+          return {
+            ok: true,
+            result: {
+              message_id: Math.floor(Math.random() * 100000),
+              date: Math.floor(Date.now() / 1000),
+              chat: { id: (payload as any)?.chat_id ?? 1, type: 'private' },
+              sticker: { file_id: (payload as any)?.sticker ?? 'mock_sticker' },
+            } as any,
+          } as any;
+        }
+        if (method === 'sendAnimation') {
+          return {
+            ok: true,
+            result: {
+              message_id: Math.floor(Math.random() * 100000),
+              date: Math.floor(Date.now() / 1000),
+              chat: { id: (payload as any)?.chat_id ?? 1, type: 'private' },
+              animation: { file_id: (payload as any)?.animation ?? 'mock_animation' },
+            } as any,
+          } as any;
+        }
+        if (method === 'sendDice') {
+          return {
+            ok: true,
+            result: {
+              message_id: Math.floor(Math.random() * 100000),
+              date: Math.floor(Date.now() / 1000),
+              chat: { id: (payload as any)?.chat_id ?? 1, type: 'private' },
+              dice: { emoji: (payload as any)?.emoji ?? '🎲', value: 3 },
             } as any,
           } as any;
         }
@@ -230,6 +266,178 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
         this.logger.error(`Error handling message: ${err.message}`, err.stack);
       }
     });
+
+    // 6. Sticker handler
+    this.bot.on('message:sticker', async (ctx) => {
+      const sticker = ctx.message.sticker;
+      await this.handleIncomingMedia(ctx, 'sticker', {
+        fileId: sticker.file_id,
+        fileSize: sticker.file_size,
+        emoji: sticker.emoji,
+        mediaLabel: 'استیکر',
+      });
+    });
+
+    // 7. Animation / GIF handler
+    this.bot.on('message:animation', async (ctx) => {
+      const animation = ctx.message.animation;
+      await this.handleIncomingMedia(ctx, 'animation', {
+        fileId: animation.file_id,
+        fileSize: animation.file_size,
+        caption: ctx.message.caption,
+        mediaLabel: 'گیف',
+      });
+    });
+
+    // 8. Dice / Animated emoji handler (🎲, 🎯, 🏀, ⚽, 🎰, 🎳)
+    this.bot.on('message:dice', async (ctx) => {
+      const dice = ctx.message.dice;
+      await this.handleIncomingMedia(ctx, 'dice', {
+        emoji: dice.emoji,
+        mediaLabel: 'ایموجی',
+      });
+    });
+
+    // 9. Photo handler
+    this.bot.on('message:photo', async (ctx) => {
+      const photos = ctx.message.photo;
+      const photo = photos[photos.length - 1];
+      await this.handleIncomingMedia(ctx, 'photo', {
+        fileId: photo.file_id,
+        fileSize: photo.file_size,
+        caption: ctx.message.caption,
+        mediaLabel: 'عکس',
+      });
+    });
+
+    // 10. Video handler
+    this.bot.on('message:video', async (ctx) => {
+      const video = ctx.message.video;
+      await this.handleIncomingMedia(ctx, 'video', {
+        fileId: video.file_id,
+        fileSize: video.file_size,
+        caption: ctx.message.caption,
+        mediaLabel: 'ویدیو',
+      });
+    });
+
+    // 11. Document handler (for GIFs or videos sent as document)
+    this.bot.on('message:document', async (ctx) => {
+      const doc = ctx.message.document;
+      const isGif = doc.mime_type === 'image/gif';
+      await this.handleIncomingMedia(ctx, isGif ? 'animation' : 'document', {
+        fileId: doc.file_id,
+        fileSize: doc.file_size,
+        caption: ctx.message.caption,
+        mediaLabel: isGif ? 'گیف' : 'فایل',
+      });
+    });
+  }
+
+  private async handleIncomingMedia(
+    ctx: Context,
+    mediaType: MessageMediaType,
+    data: {
+      fileId?: string;
+      fileSize?: number;
+      caption?: string;
+      emoji?: string;
+      mediaLabel: string;
+    },
+  ) {
+    const from = ctx.from;
+    if (!from) return;
+
+    const telegramUserId = String(from.id);
+    const content = this.formatMediaContent(mediaType, data);
+
+    try {
+      const result = await this.handleMessageUseCase.execute({
+        telegramUserId,
+        content,
+        mediaType,
+        fileId: data.fileId,
+        fileSize: data.fileSize,
+        caption: data.caption,
+        emoji: data.emoji,
+      });
+
+      if (result.success && result.recipientTelegramUserId) {
+        try {
+          if (result.isRecipientActiveInSameChat) {
+            // Direct relay based on media type
+            if (mediaType === 'sticker' && data.fileId) {
+              await this.bot.api.sendSticker(result.recipientTelegramUserId, data.fileId);
+            } else if (mediaType === 'animation' && data.fileId) {
+              await this.bot.api.sendAnimation(result.recipientTelegramUserId, data.fileId, {
+                caption: data.caption ? REPLY_TEXTS.RELAY_MESSAGE(data.caption) : undefined,
+              });
+            } else if (mediaType === 'dice' && data.emoji) {
+              await this.bot.api.sendDice(result.recipientTelegramUserId, data.emoji as any);
+            } else if (mediaType === 'photo' && data.fileId) {
+              await this.bot.api.sendPhoto(result.recipientTelegramUserId, data.fileId, {
+                caption: data.caption ? REPLY_TEXTS.RELAY_MESSAGE(data.caption) : undefined,
+              });
+            } else if (mediaType === 'video' && data.fileId) {
+              await this.bot.api.sendVideo(result.recipientTelegramUserId, data.fileId, {
+                caption: data.caption ? REPLY_TEXTS.RELAY_MESSAGE(data.caption) : undefined,
+              });
+            } else {
+              await this.bot.api.sendMessage(
+                result.recipientTelegramUserId,
+                REPLY_TEXTS.RELAY_MESSAGE(content),
+              );
+            }
+          } else {
+            // Recipient is chatting with another user -> notification with switch button
+            const switchKeyboard = new InlineKeyboard().text(
+              BUTTON_TEXTS.SWITCH_TO_CHAT(result.senderName),
+              `switch_chat:${result.chatId}`,
+            );
+
+            await this.bot.api.sendMessage(
+              result.recipientTelegramUserId,
+              REPLY_TEXTS.MEDIA_NOTIFICATION(
+                result.senderName ?? REPLY_TEXTS.DEFAULT_USER_NAME,
+                data.mediaLabel,
+              ),
+              {
+                reply_markup: switchKeyboard,
+              },
+            );
+          }
+        } catch (relayErr: any) {
+          this.logger.warn(`Could not relay media to ${result.recipientTelegramUserId}: ${relayErr.message}`);
+        }
+      } else if (!result.success && result.responseToSender) {
+        const hasActiveChat = await this.isUserInActiveChat(telegramUserId);
+        await ctx.reply(result.responseToSender, {
+          reply_markup: getMenuKeyboard(hasActiveChat),
+        });
+      }
+    } catch (err: any) {
+      this.logger.error(`Error handling media message: ${err.message}`, err.stack);
+    }
+  }
+
+  private formatMediaContent(
+    mediaType: MessageMediaType,
+    data: { emoji?: string; caption?: string },
+  ): string {
+    switch (mediaType) {
+      case 'sticker':
+        return data.emoji ? `[استیکر ${data.emoji}]` : '[استیکر]';
+      case 'animation':
+        return data.caption ? `[گیف] ${data.caption}` : '[گیف]';
+      case 'dice':
+        return `[ایموجی ${data.emoji ?? '🎲'}]`;
+      case 'photo':
+        return data.caption ? `[عکس] ${data.caption}` : '[عکس]';
+      case 'video':
+        return data.caption ? `[ویدیو] ${data.caption}` : '[ویدیو]';
+      default:
+        return data.caption ? `[رسانه] ${data.caption}` : '[رسانه]';
+    }
   }
 
   private async isUserInActiveChat(telegramUserId: string): Promise<boolean> {
