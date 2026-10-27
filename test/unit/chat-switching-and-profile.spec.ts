@@ -258,6 +258,29 @@ describe('Chat Switching and User Profile View Tests (TASK 1 & TASK 2)', () => {
       expect(profileResult.partnerName).toBe('Charlie');
     });
 
+    it('should indicate alreadyActive when switching to the already active chat', async () => {
+      const userA = await mockUserRepo.create({ telegramUserId: '1001', firstName: 'Alice' });
+      const userB = await mockUserRepo.create({ telegramUserId: '1002', firstName: 'Bob' });
+
+      const chat1 = Chat.create({ id: 'chat-1', visibility: ChatVisibility.HIDDEN });
+      mockChats.push(chat1);
+      mockParticipants.push(
+        ChatParticipant.create({ id: 'p1', chatId: chat1.id, userId: userA.id, role: ChatParticipantRole.MEMBER }),
+        ChatParticipant.create({ id: 'p2', chatId: chat1.id, userId: userB.id, role: ChatParticipantRole.MEMBER }),
+      );
+
+      userActiveChatService.setActiveChat(userA.id, chat1.id);
+
+      const switchResult = await switchUserActiveChatUseCase.execute({
+        telegramUserId: '1001',
+        targetChatId: 'chat-1',
+      });
+
+      expect(switchResult.success).toBe(true);
+      expect(switchResult.alreadyActive).toBe(true);
+      expect(switchResult.partnerName).toBe('Bob');
+    });
+
     it('should reject switching to a chat that user is not participant in', async () => {
       const userA = await mockUserRepo.create({ telegramUserId: '1001', firstName: 'Alice' });
       const userB = await mockUserRepo.create({ telegramUserId: '1002', firstName: 'Bob' });
@@ -570,7 +593,7 @@ describe('Chat Switching and User Profile View Tests (TASK 1 & TASK 2)', () => {
       it('should fail if user is not a participant in the chat', async () => {
         const userA = await mockUserRepo.create({ telegramUserId: '888001', firstName: 'Alice' });
         const userB = await mockUserRepo.create({ telegramUserId: '888002', firstName: 'Bob' });
-        const userC = await mockUserRepo.create({ telegramUserId: '888003', firstName: 'Charlie' });
+        await mockUserRepo.create({ telegramUserId: '888003', firstName: 'Charlie' });
 
         const chat = Chat.create({ id: 'c-secret', visibility: ChatVisibility.HIDDEN });
         mockChats.push(chat);

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Logger } from '../../../shared/infrastructure/logger';
 import { getEnvConfig } from '../../../shared/infrastructure/config/env.config';
 import { REPLY_TEXTS } from '../constants/reply-texts';
 
@@ -66,7 +66,6 @@ export function parseTimeUnit(unit: string, period = 1): ParsedTimeUnit {
   }
 }
 
-@Injectable()
 export class MediaRateLimiterService {
   private readonly logger = new Logger(MediaRateLimiterService.name);
   private readonly userUploads = new Map<string, number[]>();

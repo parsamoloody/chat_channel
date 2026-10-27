@@ -15,6 +15,7 @@ export interface SwitchUserActiveChatOutput {
   chatId?: string;
   partnerUser?: User;
   partnerName?: string;
+  alreadyActive?: boolean;
 }
 
 export class SwitchUserActiveChatUseCase {
@@ -52,9 +53,14 @@ export class SwitchUserActiveChatUseCase {
       };
     }
 
-    // Set new active chat
-    this.userActiveChatService.setActiveChat(user.id, input.targetChatId);
-    this.logger.log(`Switched active chat for user ${user.id} to ${input.targetChatId}`);
+    const currentActiveChatId = this.userActiveChatService.getActiveChat(user.id);
+    const isAlreadyActive = currentActiveChatId === input.targetChatId;
+
+    if (!isAlreadyActive) {
+      // Set new active chat
+      this.userActiveChatService.setActiveChat(user.id, input.targetChatId);
+      this.logger.log(`Switched active chat for user ${user.id} to ${input.targetChatId}`);
+    }
 
     const fullChat = await this.chatRepository.findWithParticipants(input.targetChatId);
     const partnerParticipant = fullChat?.participants.find((p) => p.userId !== user.id);
@@ -78,6 +84,7 @@ export class SwitchUserActiveChatUseCase {
       chatId: input.targetChatId,
       partnerUser,
       partnerName,
+      alreadyActive: isAlreadyActive,
     };
   }
 }

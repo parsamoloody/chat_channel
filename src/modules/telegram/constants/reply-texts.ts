@@ -73,6 +73,8 @@ export const REPLY_TEXTS = {
     `ورود به چت با ${partnerName}`,
   SWITCH_CHAT_SUCCESS: (partnerName: string): string =>
     `✅ شما وارد چت با **${partnerName}** شدید.\nاز این پس پیام‌های ارسالی شما به این کاربر تحویل داده می‌شود.`,
+  ALREADY_IN_CHAT: (partnerName: string): string =>
+    `شما در حال حاضر در چت ${partnerName} هستید`,
   LAST_RECEIVED_MESSAGE: (partnerName: string, content: string): string =>
     `📩 آخرین پیام دریافتی از ${partnerName}:\n💬 ${content}`,
   SWITCH_CHAT_ERROR:

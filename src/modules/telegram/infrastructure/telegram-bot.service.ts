@@ -641,6 +641,18 @@ export class TelegramBotService {
         return;
       }
 
+      if (result.alreadyActive) {
+        const partnerName = result.partnerName ?? REPLY_TEXTS.DEFAULT_USER_NAME;
+        await ctx.answerCallbackQuery({ text: REPLY_TEXTS.ALREADY_IN_CHAT(partnerName) }).catch(() => {});
+        await ctx.reply(
+          REPLY_TEXTS.ALREADY_IN_CHAT(partnerName),
+          {
+            reply_markup: ACTIVE_CHAT_KEYBOARD,
+          },
+        );
+        return;
+      }
+
       await ctx.answerCallbackQuery({ text: REPLY_TEXTS.SWITCH_CHAT_ALERT(result.partnerName ?? REPLY_TEXTS.DEFAULT_USER_NAME) });
 
       await ctx.reply(
